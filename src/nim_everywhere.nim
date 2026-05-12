@@ -1,3 +1,3 @@
-import nim_everywhere/platform
+import nim_everywhere/[async_compat, http, platform]
 
-export platform
+export async_compat, http, platform

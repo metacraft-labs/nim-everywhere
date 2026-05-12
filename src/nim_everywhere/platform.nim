@@ -2,6 +2,8 @@ import std/json
 import std/tables
 import std/times
 
+export json
+
 when not defined(js):
   import std/os
   import std/sets
@@ -205,6 +207,13 @@ proc toJsonText*(node: JsonNode): string =
 
 proc header*(name, value: string): HttpHeader =
   HttpHeader(name: name, value: value)
+
+func httpMethodName*(httpMethod: HttpMethod): string =
+  case httpMethod
+  of hmGet: "GET"
+  of hmPost: "POST"
+  of hmPut: "PUT"
+  of hmDelete: "DELETE"
 
 proc newRequest*(httpMethod: HttpMethod; url: string; body = "";
     headers: seq[HttpHeader] = @[]): HttpRequest =
