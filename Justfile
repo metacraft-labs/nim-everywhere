@@ -83,6 +83,30 @@ test-time-facade-none:
 
 test-time-matrix: test-time-facade-default test-time-facade-asyncdispatch test-time-facade-chronos test-time-facade-none
 
+# NE-Time-Fork-Chronos hook recipes.
+#
+# Local dev recipes; requires `~/metacraft/nim-chronos` clone on the
+# `clock-injection-hook` branch. Not wired into the umbrella `test`
+# target because the path override in `config.nims` points at the
+# developer's machine — once the hook lands upstream, the override
+# goes away and these recipes fold back into the default matrix.
+
+test-time-chronos-hook:
+    @if nim check --hints:off -d:asyncBackend=chronos -d:chronosClockHook --path:src tests/test_chronos_fake_clock.nim >/dev/null 2>&1; then \
+      nim c -r -d:asyncBackend=chronos -d:chronosClockHook --path:src tests/test_chronos_fake_clock.nim; \
+    else \
+      echo "[test-time-chronos-hook] chronos hook not available; skipping"; \
+    fi
+
+# Re-run the existing time-facade suite under the chronos hook to prove
+# no regressions when the hook is engaged.
+test-time-facade-chronos-hook:
+    @if nim check --hints:off -d:asyncBackend=chronos -d:chronosClockHook --path:src tests/test_time_facade.nim >/dev/null 2>&1; then \
+      nim c -r -d:asyncBackend=chronos -d:chronosClockHook --path:src tests/test_time_facade.nim; \
+    else \
+      echo "[test-time-facade-chronos-hook] chronos hook not available; skipping"; \
+    fi
+
 lint: lint-nim lint-nix
 
 lint-nim:

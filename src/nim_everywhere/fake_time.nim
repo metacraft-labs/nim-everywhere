@@ -44,6 +44,18 @@ type
 # to the real backend's sleep primitive in that case.
 var currentContext {.threadvar.}: FakeAsyncContext
 
+# Backend-specific hooks for native clock injection (NE-Time-Fork-Chronos
+# and later NE-Time-Fork-Asyncdispatch). When set, these are invoked from
+# `install` / `uninstall` so the backend's own timer wheel observes the
+# fake clock — not just code paths that route through `sleepFor`.
+#
+# The hooks are procedure variables (not direct chronos / asyncdispatch
+# imports) so this module remains backend-neutral. The backend-specific
+# wiring module (e.g. `chronos_fake_clock.nim`) sets the procs on its
+# own module init. Nil-by-default keeps the un-hook path zero-cost.
+var clockHookInstaller*: proc(ctx: FakeAsyncContext) {.gcsafe.}
+var clockHookUninstaller*: proc(ctx: FakeAsyncContext) {.gcsafe.}
+
 proc newFakeAsyncContext*(): FakeAsyncContext =
   FakeAsyncContext(nowMs: 0, scheduled: @[], sequence: 0, prior: nil)
 
@@ -56,14 +68,22 @@ proc install*(ctx: FakeAsyncContext) =
   ## Make `ctx` the active fake context for the current thread. Any
   ## previously-installed context is stored on `ctx.prior` so a later
   ## `uninstall` restores it. Supports nested test contexts.
+  ##
+  ## When a backend-specific clock hook is registered (currently chronos
+  ## via `chronos_fake_clock.nim`), it is invoked here so the backend's
+  ## own timer wheel observes the fake clock.
   ctx.prior = currentContext
   currentContext = ctx
+  if clockHookInstaller != nil:
+    clockHookInstaller(ctx)
 
 proc uninstall*(ctx: FakeAsyncContext) =
   ## Restore the previously-installed context (or `nil`). Calling
   ## `uninstall` on a context that is not currently installed is a no-op
   ## with respect to thread-local state, but still clears the saved
   ## `prior` pointer so the context can be re-installed cleanly.
+  if clockHookUninstaller != nil:
+    clockHookUninstaller(ctx)
   if currentContext == ctx:
     currentContext = ctx.prior
   ctx.prior = nil
