@@ -8,12 +8,13 @@ build-native:
     nim c --path:src tests/test_async_http.nim
     nim c --path:src tests/test_async_backend.nim
     nim c --path:src tests/test_fake_time.nim
+    nim c --path:src tests/test_time_facade.nim
 
 build-js:
     nim js --path:src tests/test_platform_smoke.nim
     nim js --path:src tests/test_async_http.nim
 
-test: test-native test-js test-async-matrix
+test: test-native test-js test-async-matrix test-time-matrix
 
 test-native:
     nim c -r --path:src tests/test_platform_smoke.nim
@@ -58,6 +59,30 @@ test-async-none:
 
 test-async-matrix: test-async-default test-async-asyncdispatch test-async-chronos test-async-none
 
+# Time-facade matrix — NE-Time-M0. Exercises the expanded time facade
+# (monotonicNowMs, withTimeout, scheduleAt, scheduleEvery, cancelTimer)
+# under every supported native backend. Mirrors the structure of
+# `test-async-*` above; chronos is gated behind a `nim check` probe
+# because it may not be installed in every local dev environment.
+
+test-time-facade-default:
+    nim c -r --path:src tests/test_time_facade.nim
+
+test-time-facade-asyncdispatch:
+    nim c -r -d:asyncBackend=asyncdispatch --path:src tests/test_time_facade.nim
+
+test-time-facade-chronos:
+    @if nim check --hints:off -d:asyncBackend=chronos --path:src tests/test_time_facade.nim >/dev/null 2>&1; then \
+      nim c -r -d:asyncBackend=chronos --path:src tests/test_time_facade.nim; \
+    else \
+      echo "[test-time-facade-chronos] chronos not available on nimble path; skipping"; \
+    fi
+
+test-time-facade-none:
+    nim c -r -d:asyncBackend=none --path:src tests/test_time_facade.nim
+
+test-time-matrix: test-time-facade-default test-time-facade-asyncdispatch test-time-facade-chronos test-time-facade-none
+
 lint: lint-nim lint-nix
 
 lint-nim:
@@ -65,6 +90,7 @@ lint-nim:
     nim check --path:src tests/test_async_http.nim
     nim check --path:src tests/test_async_backend.nim
     nim check --path:src tests/test_fake_time.nim
+    nim check --path:src tests/test_time_facade.nim
 
 lint-nix:
     nixfmt --check flake.nix
@@ -72,7 +98,7 @@ lint-nix:
 format: format-nim format-nix
 
 format-nim:
-    nimpretty src/nim_everywhere.nim src/nim_everywhere/*.nim tests/test_async_backend.nim tests/test_async_http.nim tests/test_fake_time.nim tests/test_platform_smoke.nim
+    nimpretty src/nim_everywhere.nim src/nim_everywhere/*.nim tests/test_async_backend.nim tests/test_async_http.nim tests/test_fake_time.nim tests/test_platform_smoke.nim tests/test_time_facade.nim
 
 format-nix:
     nixfmt flake.nix

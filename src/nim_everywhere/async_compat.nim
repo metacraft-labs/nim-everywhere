@@ -21,11 +21,13 @@
 ## `onCompleteVoid`, `newCompletedFuture`, `newFailedFuture`,
 ## `drainPlatformCallbacks` — is stable across all backends.
 ##
-## `sleepFor(ms)` returns a `PlatformFuture[void]` that completes after
-## `ms` milliseconds. When a `FakeAsyncContext` (from `fake_time.nim`)
-## is installed on the current thread, `sleepFor` detours through the
-## fake context regardless of the underlying real backend. This is what
-## lets fake-time tests run identically across the matrix.
+## `sleepFor` and the rest of the time-related facade
+## (`monotonicNowMs`, `withTimeout`, `scheduleAt`, `scheduleEvery`,
+## `cancelTimer`) live in `nim_everywhere/time.nim`. NE-Time-M0 split
+## `sleepFor` out so consumers that only need the bare future surface
+## don't have to pull in the timer machinery. The umbrella module
+## `nim_everywhere.nim` re-exports both, so `import nim_everywhere`
+## continues to work for every existing caller.
 
 import ./fake_time
 export fake_time
@@ -75,8 +77,17 @@ else:
 
   elif asyncBackend == "chronos":
     import chronos
+    import std/heapqueue as stdHeapqueue
     export chronos
     type PlatformFuture*[T] = chronos.Future[T]
+
+    proc chronosHasTimers(): bool {.inline.} =
+      ## Workaround: `disp.timers.len` is ambiguous between
+      ## `std/heapqueue.len` and chronos's `AsyncQueue.len` at the
+      ## call site. Resolve explicitly via `std/heapqueue` and
+      ## return a bool so callers don't need to know the type.
+      let timers = getThreadDispatcher().timers
+      stdHeapqueue.len(timers) > 0
 
   elif asyncBackend == "none":
     # Sync-stub backend. There is no event loop driving completion —
@@ -163,8 +174,25 @@ proc drainPlatformCallbacks*() =
       except ValueError:
         discard
     elif asyncBackend == "chronos":
+      # chronos's `poll()` blocks on `selectInto` when its callback
+      # queue holds only the sentinel and no timers / idlers are
+      # registered. That's the wrong shape for a "drain whatever is
+      # ready" helper, so skip the poll if there's nothing for us to
+      # flush. The dispatcher's deque always holds a sentinel between
+      # polls, so we treat any queue of size > 1 as "has real work".
+      # (We can't check sentinel identity from outside chronos, but a
+      # length-1 queue can only contain the sentinel — chronos always
+      # adds new callbacks via `addLast`, after the sentinel.)
       try:
-        poll()
+        # Skip the poll entirely when chronos has nothing to drain. A
+        # `poll()` with empty callbacks AND no pending timers blocks on
+        # `selectInto` waiting for the next timer, which is the wrong
+        # shape for a "drain whatever is ready" helper. The dispatcher's
+        # deque always holds a sentinel between polls, so we treat any
+        # callback length > 1 as "real callback work pending". Timer
+        # work is handled separately via `chronosHasTimers()`.
+        if getThreadDispatcher().callbacks.len > 1 or chronosHasTimers():
+          poll()
       except CatchableError:
         discard
     elif asyncBackend == "none":
@@ -286,49 +314,8 @@ proc newFailedFuture*[T](message: string): PlatformFuture[T] =
     result = newFuture[T]("nim-everywhere failed future")
     result.fail(newException(CatchableError, message))
 
-proc sleepFor*(ms: int): PlatformFuture[void] =
-  ## Cross-backend sleep primitive.
-  ##
-  ## If a `FakeAsyncContext` is installed on the current thread, the
-  ## returned future completes when the fake context fires the
-  ## scheduled callback (i.e. when test code calls `advance(ms)` +
-  ## `runPending()`). The real backend's sleep primitive is bypassed
-  ## entirely — this is what makes fake-time tests work uniformly
-  ## across the matrix.
-  ##
-  ## When no fake context is installed, `sleepFor` falls through to:
-  ##   - JS: `setTimeout(ms)`-backed Promise
-  ##   - asyncdispatch: `std/asyncdispatch.sleepAsync(ms)`
-  ##   - chronos: `chronos.sleepAsync(ms.milliseconds)`
-  ##   - none: raises a Defect (no event loop, no fake context →
-  ##           there is nothing that could wake the sleep)
-  let fake = currentFakeContext()
-  if fake != nil:
-    when defined(js):
-      # Build a Promise<void> that completes when the fake context fires
-      # the scheduled callback. asyncjs's `newPromise` for `Future[void]`
-      # takes a `proc(resolve: proc())` resolver.
-      var resolveFn: proc()
-      result = newPromise proc(resolve: proc()) =
-        resolveFn = resolve
-      fake.schedule(ms, proc() = resolveFn())
-    else:
-      let fut = newFuture[void]("nim-everywhere sleepFor (fake-time)")
-      fake.schedule(ms, proc() = fut.complete())
-      result = fut
-    return
-
-  when defined(js):
-    let msArg = ms
-    result = newPromise proc(resolve: proc()) =
-      {.emit: "setTimeout(function() { `resolve`(); }, `msArg`);".}
-  else:
-    when asyncBackend in ["", "asyncdispatch"]:
-      result = sleepAsync(ms)
-    elif asyncBackend == "chronos":
-      result = chronos.sleepAsync(chronos.milliseconds(ms))
-    elif asyncBackend == "none":
-      raise newException(Defect,
-        "sleepFor without an installed FakeAsyncContext requires an event loop; " &
-        "build with -d:asyncBackend=asyncdispatch|chronos, or install a " &
-        "FakeAsyncContext for deterministic tests")
+# Note: `sleepFor` was moved to `nim_everywhere/time.nim` as part of
+# NE-Time-M0. The umbrella module re-exports `time.nim` so any caller
+# that does `import nim_everywhere` keeps seeing `sleepFor` unchanged.
+# Direct importers of `nim_everywhere/async_compat` that need `sleepFor`
+# should add `import nim_everywhere/time`.
