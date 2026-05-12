@@ -107,6 +107,35 @@ test-time-facade-chronos-hook:
       echo "[test-time-facade-chronos-hook] chronos hook not available; skipping"; \
     fi
 
+# NE-Time-Fork-Asyncdispatch hook recipes.
+#
+# Local dev recipes; requires `~/metacraft/codetracer-nim` clone on the
+# `clock-injection-hook` branch (the Nim fork carrying the patched
+# `lib/pure/asyncdispatch.nim`). The `--lib:` switch must be passed on
+# the *command line* — see the `config.nims` comment for why it cannot
+# be expressed as `switch("lib", ...)`. Not wired into the umbrella
+# `test` target because the path is the developer's machine — once the
+# hook lands upstream in Nim, the override goes away and these recipes
+# fold back into the default matrix.
+
+asyncdispatch_fork_lib := "/home/zahary/metacraft/codetracer-nim/lib"
+
+test-time-asyncdispatch-hook:
+    @if nim check --hints:off --lib:{{asyncdispatch_fork_lib}} -d:asyncBackend=asyncdispatch -d:asyncdispatchClockHook --path:src tests/test_asyncdispatch_fake_clock.nim >/dev/null 2>&1; then \
+      nim c -r --lib:{{asyncdispatch_fork_lib}} -d:asyncBackend=asyncdispatch -d:asyncdispatchClockHook --path:src tests/test_asyncdispatch_fake_clock.nim; \
+    else \
+      echo "[test-time-asyncdispatch-hook] codetracer-nim fork unavailable or asyncdispatch hook not built; skipping"; \
+    fi
+
+# Re-run the existing time-facade suite under the asyncdispatch hook to
+# prove no regressions when the hook is engaged.
+test-time-facade-asyncdispatch-hook:
+    @if nim check --hints:off --lib:{{asyncdispatch_fork_lib}} -d:asyncBackend=asyncdispatch -d:asyncdispatchClockHook --path:src tests/test_time_facade.nim >/dev/null 2>&1; then \
+      nim c -r --lib:{{asyncdispatch_fork_lib}} -d:asyncBackend=asyncdispatch -d:asyncdispatchClockHook --path:src tests/test_time_facade.nim; \
+    else \
+      echo "[test-time-facade-asyncdispatch-hook] codetracer-nim fork unavailable or asyncdispatch hook not built; skipping"; \
+    fi
+
 lint: lint-nim lint-nix
 
 lint-nim:
