@@ -4,6 +4,65 @@ import std/times
 
 when not defined(js):
   import std/os
+  import std/sets
+
+# Cross-target collection seams. Originally lived in isonim/core/platform.nim;
+# moved here so both isonim and other consumers can share the JS/native split.
+#
+#   JS backend:  native Map / Set / Array (zero overhead, no Nim hashtable
+#                in the JS bundle).
+#   C backend:   std/tables, std/sets, string, seq (Nim standard library).
+when defined(js):
+  import js_collections
+  export js_collections
+
+  type
+    HashMap*[K, V] = JsMap[K, V]
+      ## Key-value map: JS Map on browser, Table on server.
+    HashSet*[T] = JsSet[T]
+      ## Value set: JS Set on browser, HashSet on server.
+    HashMapRef*[K, V] = JsMap[K, V]
+      ## Nil-able ref map. On JS, JsMap is already a ref type.
+      ## On C, this is TableRef (heap-allocated, nil-able).
+    NativeString* = cstring
+      ## String type native to the platform: JS string on browser,
+      ## Nim string on server.
+    NativeSeq*[T] = JsArray[T]
+      ## Sequence type with reference semantics: JS Array on browser,
+      ## Nim seq on server. Assignment copies the reference (not the data)
+      ## on JS, matching JS framework behavior.
+
+  template newHashMap*[K, V](): HashMap[K, V] = newJsMap[K, V]()
+  template newHashSet*[T](): HashSet[T] = newJsSet[T]()
+  template newHashMapRef*[K, V](): HashMapRef[K, V] = newJsMap[K, V]()
+  template newNativeSeq*[T](): NativeSeq[T] = newJsArray[T]()
+  template newNativeSeq*[T](len: int): NativeSeq[T] = newJsArray[T](len)
+
+  template toNative*(s: string): NativeString = cstring(s)
+  template toNative*(s: cstring): NativeString = s
+
+  # NativeString concatenation (JS + operator)
+  proc `&`*(a, b: NativeString): NativeString {.importcpp: "(# + #)".}
+  proc `&`*(a: NativeString, b: string): NativeString {.importcpp: "(# + #)".}
+  proc `&`*(a: string, b: NativeString): NativeString {.importcpp: "(# + #)".}
+
+else:
+  export tables, sets
+
+  type
+    HashMap*[K, V] = Table[K, V]
+    HashSet*[T] = sets.HashSet[T]
+    HashMapRef*[K, V] = TableRef[K, V]
+    NativeString* = string
+    NativeSeq*[T] = seq[T]
+
+  template newHashMap*[K, V](): HashMap[K, V] = initTable[K, V]()
+  template newHashSet*[T](): HashSet[T] = sets.initHashSet[T]()
+  template newHashMapRef*[K, V](): HashMapRef[K, V] = newTable[K, V]()
+  template newNativeSeq*[T](): NativeSeq[T] = newSeq[T]()
+  template newNativeSeq*[T](len: int): NativeSeq[T] = newSeq[T](len)
+
+  template toNative*(s: string): NativeString = s
 
 type
   PlatformError* = object of CatchableError
