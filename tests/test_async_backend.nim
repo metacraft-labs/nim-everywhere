@@ -39,13 +39,12 @@ suite "nim-everywhere async backend (matrix)":
     check err == "boom"
 
   test "void future completes via onComplete(proc())":
-    let fut = newFuture[void]("test-void")
+    let fut = newCompletedFuture()
     var done = false
     var err = ""
     fut.onComplete(
       proc() = done = true,
       proc(m: string) = err = m)
-    fut.complete()
     drainPlatformCallbacks()
     check done
     check err == ""

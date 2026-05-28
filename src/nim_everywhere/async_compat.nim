@@ -305,6 +305,15 @@ proc newCompletedFuture*[T](value: T): PlatformFuture[T] =
     result = newFuture[T]("nim-everywhere completed future")
     result.complete(value)
 
+proc newCompletedFuture*(): PlatformFuture[void] =
+  when defined(js):
+    result = newPromise proc(resolve: proc()) =
+      resolve()
+    {.emit: "`result`.__syncResolved = true; `result`.__syncValue = undefined;".}
+  else:
+    result = newFuture[void]("nim-everywhere completed void future")
+    result.complete()
+
 proc newFailedFuture*[T](message: string): PlatformFuture[T] =
   when defined(js):
     result = newPromise proc(resolve: proc(value: T)) =
