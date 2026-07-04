@@ -1,0 +1,9 @@
+schema = "reprobuild.solved-graph-lock.v2"
+
+[lock]
+platform = "amd64-linux"
+optimal = false
+inputs_digest = "fnv1a64:072f6c573b6ac221"
+variants = []
+packages = [{ name = "gcc", version = "12.0.0", source = "gcc" }, { name = "nim", version = "2.0.0", source = "nim" }, { name = "nim_everywhere", version = "0.1.0", source = "nim_everywhere" }]
+deps = [{ name = "nim-everywhere", path = ".", coord_kind = "vcs", url = "", ref = "mcr-stege0-and-fixes", revision = "1434b8d0187d9892b165400ad19ea1cf6425c8a8", integrity = "git-sha1:1434b8d0187d9892b165400ad19ea1cf6425c8a8", version = "", visibility = "public", participation = "", depends = "", groups = "" }]
