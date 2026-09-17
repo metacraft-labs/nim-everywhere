@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev, stable]
   pull_request:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [eph-linux-x64, eph-linux-arm64, eph-macos-arm64]
+        runner: [[self-hosted, linux, x64], [self-hosted, linux, arm64], [self-hosted, macos, arm64]]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -24,13 +24,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-log-${{ matrix.runner }}
+          name: test-log-${{ join(matrix.runner, '-') }}
           path: test.log
   lint:
     strategy:
       fail-fast: false
       matrix:
-        runner: [eph-linux-x64, eph-linux-arm64, eph-macos-arm64]
+        runner: [[self-hosted, linux, x64], [self-hosted, linux, arm64], [self-hosted, macos, arm64]]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -41,13 +41,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lint-log-${{ matrix.runner }}
+          name: lint-log-${{ join(matrix.runner, '-') }}
           path: lint.log
   nix-build:
     strategy:
       fail-fast: false
       matrix:
-        runner: [eph-linux-x64, eph-linux-arm64, eph-macos-arm64]
+        runner: [[self-hosted, linux, x64], [self-hosted, linux, arm64], [self-hosted, macos, arm64]]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -58,5 +58,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nix-build-log-${{ matrix.runner }}
+          name: nix-build-log-${{ join(matrix.runner, '-') }}
           path: nix-build.log

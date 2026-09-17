@@ -3,7 +3,7 @@ schema = "reprobuild.solved-graph-lock.v2"
 [lock]
 platform = "amd64-linux"
 optimal = false
-inputs_digest = "fnv1a64:072f6c573b6ac221"
+inputs_digest = "fnv1a64:34996b39dde0fb3d"
 variants = []
-packages = [{ name = "gcc", version = "12.0.0", source = "gcc" }, { name = "nim", version = "2.0.0", source = "nim" }, { name = "nim_everywhere", version = "0.1.0", source = "nim_everywhere" }]
-deps = [{ name = "nim-everywhere", path = ".", coord_kind = "vcs", url = "", ref = "mcr-stege0-and-fixes", revision = "1434b8d0187d9892b165400ad19ea1cf6425c8a8", integrity = "git-sha1:1434b8d0187d9892b165400ad19ea1cf6425c8a8", version = "", visibility = "public", participation = "", depends = "", groups = "" }]
+packages = [{ name = "gcc", version = "12.0.0", source = "gcc", selection = "selected" }, { name = "nim", version = "2.0.0", source = "nim", selection = "selected" }, { name = "nim_everywhere", version = "0.1.0", source = "nim_everywhere", selection = "selected" }]
+deps = [{ name = "nim-everywhere", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/nim-everywhere", ref = "dev", revision = "bb8c8d7aa9f036d7ce1b353b7a4140cf95134f9c", integrity = "git-sha1:bb8c8d7aa9f036d7ce1b353b7a4140cf95134f9c", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
