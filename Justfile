@@ -9,6 +9,7 @@ build-native:
     nim c --path:src tests/test_async_backend.nim
     nim c --path:src tests/test_fake_time.nim
     nim c --path:src tests/test_time_facade.nim
+    nim c --path:src tests/test_nimcache_is_worktree_local.nim
 
 build-js:
     nim js --path:src tests/test_platform_smoke.nim
@@ -19,6 +20,7 @@ test: test-native test-js test-async-matrix test-time-matrix
 test-native:
     nim c -r --path:src tests/test_platform_smoke.nim
     nim c -r --path:src tests/test_async_http.nim
+    nim c -r --path:src tests/test_nimcache_is_worktree_local.nim
 
 test-js:
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
