@@ -143,13 +143,35 @@ when defined(js):
 else:
   import std/dynlib
 
+  const cryptoLibOverride* {.strdefine: "nimEverywhereCryptoLib".} = ""
+    ## An explicit library to try FIRST, for a product that knows where its
+    ## libcrypto is — a macOS app bundle, say, which ships one under
+    ## `@executable_path/../Frameworks/`. A compile-time define rather than an
+    ## environment variable on purpose: a runtime knob that chooses which
+    ## library verifies signatures is one edit away from choosing one that
+    ## does not.
+
   const CryptoLibNames =
     when defined(windows):
       ["libcrypto-3-x64.dll", "libcrypto-3.dll", "libcrypto-1_1-x64.dll",
-       "libcrypto.dll"]
+       "libcrypto-1_1.dll"]
     elif defined(macosx):
-      ["libcrypto.3.dylib", "libcrypto.1.1.dylib", "libcrypto.dylib"]
+      # NO BARE `libcrypto.dylib` HERE, AND THIS IS NOT TIDINESS. On macOS that
+      # name resolves to Apple's own LibreSSL in `/usr/lib`, which the OS
+      # refuses to let a third-party binary load — and it refuses by printing
+      # "loading libcrypto in an unsafe way" and KILLING THE PROCESS. It cannot
+      # be probed and recovered from, so a candidate list containing it turns
+      # "this host has no libcrypto" from a verdict into a crash.
+      #
+      # Measured: nim-everywhere PR #10's `test (self-hosted, macos, arm64)`
+      # aborted inside `loadLib` with exactly that warning. The versioned names
+      # are safe because Apple's is `libcrypto.NN.dylib` with a LibreSSL
+      # number, so they cannot match it.
+      ["libcrypto.3.dylib", "libcrypto.1.1.dylib"]
     else:
+      # `libcrypto.so` is the development symlink and is absent on a host with
+      # only the runtime package, so the versioned names come first and it is
+      # the fallback rather than the first guess.
       ["libcrypto.so.3", "libcrypto.so.1.1", "libcrypto.so"]
 
   type
@@ -206,7 +228,12 @@ else:
     if libTried:
       return lib != nil and d2iPubkey != nil
     libTried = true
-    for name in CryptoLibNames:
+    var candidates: seq[string] = @[]
+    if cryptoLibOverride.len > 0:
+      candidates.add(cryptoLibOverride)
+    for n in CryptoLibNames:
+      candidates.add(n)
+    for name in candidates:
       lib = loadLib(name)
       if lib != nil:
         if bindAll():

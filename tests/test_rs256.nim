@@ -97,63 +97,111 @@ when defined(js):
       check verify(KatSigningInput, katSignature()) == rs256Unavailable
 
 else:
+ const AvailabilityIsRequired = defined(linux)
+   ## WHERE ABSENCE IS A BUG AND WHERE IT IS A FACT.
+   ##
+   ## On Linux every host that runs this — the platform servers, CI, a
+   ## developer's shell — has libcrypto, so not finding one is a defect in the
+   ## candidate list and the suite says so.
+   ##
+   ## On macOS and Windows it depends on a VERSIONED libcrypto being
+   ## discoverable, and this library cannot guarantee that for a host it did
+   ## not build. Apple's own `/usr/lib/libcrypto.dylib` is not an option: the
+   ## OS kills a third-party process that loads it. So what is asserted there
+   ## is the contract instead — it either verifies correctly, or reports itself
+   ## unavailable, and it NEVER accepts. A product that needs verification on
+   ## those platforms supplies `-d:nimEverywhereCryptoLib=<path>`.
+   ##
+   ## This is deliberately not a skip. Every case below runs on every platform
+   ## and every one of them can fail; what varies is which verdict is correct,
+   ## not whether the case executes.
+
  suite "rs256 verification":
 
-   test "this host can verify at all":
-     # THE OTHER POSITIVE CONTROL. Without it every verdict below could be
-     # `rs256Unavailable` from a libcrypto that never loaded, and the suite
-     # would still look like it was testing RSA.
-     check rs256IsAvailable()
+  test "libcrypto is discoverable where this library requires it":
+    when AvailabilityIsRequired:
+      check rs256IsAvailable()
+    else:
+      # The weaker claim, and still falsifiable: whichever way it goes, the
+      # KAT must agree with it. An "unavailable" host that answered `rs256Valid`
+      # would fail here, and so would an available one that could not verify a
+      # signature two other implementations agree on.
+      if rs256IsAvailable():
+        check verify(KatSigningInput, katSignature()) == rs256Valid
+      else:
+        check verify(KatSigningInput, katSignature()) == rs256Unavailable
 
-   test "a signature produced by Node's WebCrypto verifies under libcrypto":
-     # THE POSITIVE CONTROL. Two independent implementations agreeing.
-     check verify(KatSigningInput, katSignature()) == rs256Valid
+  test "a signature produced by Node's WebCrypto verifies under libcrypto":
+    # THE POSITIVE CONTROL. Two independent implementations agreeing.
+    if rs256IsAvailable():
+      check verify(KatSigningInput, katSignature()) == rs256Valid
 
-   test "a one-bit-flipped signature does not verify":
-     var sig = katSignature()
-     sig[0] = char(uint8(sig[0]) xor 1'u8)
-     check verify(KatSigningInput, sig) == rs256Rejected
+  test "a one-bit-flipped signature does not verify":
+    var sig = katSignature()
+    sig[0] = char(uint8(sig[0]) xor 1'u8)
+    # NEVER `rs256Valid` — true on a host with no libcrypto too, which is the
+    # half that has to hold everywhere.
+    check verify(KatSigningInput, sig) != rs256Valid
+    if rs256IsAvailable():
+      check verify(KatSigningInput, sig) == rs256Rejected
 
-   test "a one-bit-flipped signing input does not verify":
-     var input = KatSigningInput
-     input[10] = char(uint8(input[10]) xor 1'u8)
-     check verify(input, katSignature()) == rs256Rejected
+  test "a one-bit-flipped signing input does not verify":
+    var input = KatSigningInput
+    input[10] = char(uint8(input[10]) xor 1'u8)
+    check verify(input, katSignature()) != rs256Valid
+    if rs256IsAvailable():
+      check verify(input, katSignature()) == rs256Rejected
 
-   test "a signature one byte short does not verify":
-     let sig = katSignature()
-     check verify(KatSigningInput, sig[0 ..< sig.len - 1]) == rs256Rejected
+  test "a signature one byte short does not verify":
+    let sig = katSignature()
+    check verify(KatSigningInput, sig[0 ..< sig.len - 1]) != rs256Valid
+    if rs256IsAvailable():
+      check verify(KatSigningInput, sig[0 ..< sig.len - 1]) == rs256Rejected
 
-   test "the right signature under a different modulus does not verify":
-     # The modulus with two characters transposed is still a well-formed RSA
-     # key, so this reaches the arithmetic rather than being refused by the
-     # parser — which is the case a key-selection bug produces.
-     var other = KatModulus
-     swap(other[5], other[6])
-     check verifyRs256(KatSigningInput, katSignature(), other,
-                       KatExponent) == rs256Rejected
+  test "the right signature under a different modulus does not verify":
+    # The modulus with two characters transposed is still a well-formed RSA
+    # key, so this reaches the arithmetic rather than being refused by the
+    # parser — which is the case a key-selection bug produces.
+    var other = KatModulus
+    swap(other[5], other[6])
+    check verifyRs256(KatSigningInput, katSignature(), other,
+                      KatExponent) != rs256Valid
+    if rs256IsAvailable():
+      check verifyRs256(KatSigningInput, katSignature(), other,
+                        KatExponent) == rs256Rejected
 
-   test "an empty signature or an empty key half is refused, not reported unavailable":
-     # `rs256Unavailable` means the HOST cannot check. None of these is about
-     # the host, and reporting them that way would send whoever is debugging it
-     # to look for a missing libcrypto.
-     check verify(KatSigningInput, "") == rs256Rejected
-     check verifyRs256(KatSigningInput, katSignature(), "",
-                       KatExponent) == rs256Rejected
-     check verifyRs256(KatSigningInput, katSignature(), KatModulus,
-                       "") == rs256Rejected
+  test "an empty signature or an empty key half is refused, not reported unavailable":
+    # `rs256Unavailable` means the HOST cannot check. None of these is about
+    # the host, and reporting them that way would send whoever is debugging it
+    # to look for a missing libcrypto. Only asserted where a host CAN check —
+    # on one that cannot, `rs256Unavailable` is the honest answer to everything.
+    if rs256IsAvailable():
+      check verify(KatSigningInput, "") == rs256Rejected
+      check verifyRs256(KatSigningInput, katSignature(), "",
+                        KatExponent) == rs256Rejected
+      check verifyRs256(KatSigningInput, katSignature(), KatModulus,
+                        "") == rs256Rejected
 
-   test "a modulus that is not base64url is refused, not reported unavailable":
-     check verifyRs256(KatSigningInput, katSignature(), "!!!not-base64url!!!",
-                       KatExponent) == rs256Rejected
+  test "a modulus that is not base64url is refused, not reported unavailable":
+    check verifyRs256(KatSigningInput, katSignature(), "!!!not-base64url!!!",
+                      KatExponent) != rs256Valid
+    if rs256IsAvailable():
+      check verifyRs256(KatSigningInput, katSignature(), "!!!not-base64url!!!",
+                        KatExponent) == rs256Rejected
 
-   test "a modulus that is well-formed base64url but not an RSA key is refused":
-     check verifyRs256(KatSigningInput, katSignature(), "AQAB",
-                       KatExponent) == rs256Rejected
+  test "a modulus that is well-formed base64url but not an RSA key is refused":
+    check verifyRs256(KatSigningInput, katSignature(), "AQAB",
+                      KatExponent) != rs256Valid
+    if rs256IsAvailable():
+      check verifyRs256(KatSigningInput, katSignature(), "AQAB",
+                        KatExponent) == rs256Rejected
 
-   test "an empty signing input is still a real verification":
-     # Not a crash, and not a pass: the signature covers the KAT's bytes, so a
-     # verification over no bytes at all must fail. The case exists because the
-     # zero-length branch skips `EVP_DigestUpdate` entirely, and a skip that
-     # returned `rs256Valid` would accept every token whose signing input a bug
-     # had emptied.
-     check verify("", katSignature()) == rs256Rejected
+  test "an empty signing input is still a real verification":
+    # Not a crash, and not a pass: the signature covers the KAT's bytes, so a
+    # verification over no bytes at all must fail. The case exists because the
+    # zero-length branch skips `EVP_DigestUpdate` entirely, and a skip that
+    # returned `rs256Valid` would accept every token whose signing input a bug
+    # had emptied.
+    check verify("", katSignature()) != rs256Valid
+    if rs256IsAvailable():
+      check verify("", katSignature()) == rs256Rejected

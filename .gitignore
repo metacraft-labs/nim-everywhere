@@ -11,3 +11,4 @@ result
 
 # Repro development environment cache
 .repro/
+.nimcache/
