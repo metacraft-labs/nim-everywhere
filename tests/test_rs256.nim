@@ -119,6 +119,11 @@ else:
  suite "rs256 verification":
 
   test "libcrypto is discoverable where this library requires it":
+    # SAID OUT LOUD, because on a platform where availability is not required
+    # both branches below print `[OK]` and the transcript would not say which
+    # world the run was in. A macOS lane that quietly took the "unavailable"
+    # path would look exactly like one that verified a real signature.
+    echo "    libcrypto available on this host: ", rs256IsAvailable()
     when AvailabilityIsRequired:
       check rs256IsAvailable()
     else:
