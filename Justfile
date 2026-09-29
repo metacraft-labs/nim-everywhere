@@ -10,10 +10,12 @@ build-native:
     nim c --path:src tests/test_fake_time.nim
     nim c --path:src tests/test_time_facade.nim
     nim c --path:src tests/test_nimcache_is_worktree_local.nim
+    nim c --path:src tests/test_rs256.nim
 
 build-js:
     nim js --path:src tests/test_platform_smoke.nim
     nim js --path:src tests/test_async_http.nim
+    nim js --path:src tests/test_rs256.nim
 
 test: test-native test-js test-async-matrix test-time-matrix
 
@@ -21,10 +23,17 @@ test-native:
     nim c -r --path:src tests/test_platform_smoke.nim
     nim c -r --path:src tests/test_async_http.nim
     nim c -r --path:src tests/test_nimcache_is_worktree_local.nim
+    nim c -r --path:src tests/test_rs256.nim
+    # A bad `-d:nimEverywhereCryptoLib` must not be able to turn verification
+    # off. The override is tried FIRST, so an override naming a file that does
+    # not exist is the one way a caller could silently disable a signature
+    # check; the same suite has to stay green through the fallback.
+    nim c -r -d:nimEverywhereCryptoLib=/nonexistent/libcrypto.so.3 --path:src --nimcache:.nimcache/rs256-override tests/test_rs256.nim
 
 test-js:
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_async_http.nim
+    bash tools/nim-js-test-gate.sh --path:src tests/test_rs256.nim
 
 # Async backend matrix — exercise async_compat + fake_time under each
 # supported native backend (default/unset, asyncdispatch, chronos, none).
