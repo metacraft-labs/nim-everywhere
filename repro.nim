@@ -163,7 +163,10 @@ package nim_everywhere:
     # shell furnishes a 2.2.x toolchain). Sufficient for the path-mode
     # resolver under ``nix develop``.
     "nim >=2.0 <3.0"
-    "gcc >=12"
+    when defined(macosx):
+      "clang >=14"
+    else:
+      "gcc >=12"
 
   # Library declaration — the ``src/`` tree is importable when this
   # package is consumed via ``uses: "nim_everywhere"``. The umbrella is
@@ -196,6 +199,12 @@ package nim_everywhere:
         binary = binary,
         paths = @["src"],
         actionId = "nim_everywhere.test_build." & stem)
+      # Nim invokes its platform C backend; name it on this actual compile
+      # action so action-scoped tool provisioning includes its executable.
+      when defined(macosx):
+        appendRegisteredActionToolIdentityRefs(edge.action.id, ["clang"])
+      else:
+        appendRegisteredActionToolIdentityRefs(edge.action.id, ["gcc"])
       buildActions.add(edge.action)
       # ``registerImplicitName = false`` because the BUILD edge already
       # owns the binary basename as the implicit target name; the explicit
