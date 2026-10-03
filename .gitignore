@@ -6,9 +6,11 @@ nimcache/
 .nimcache/
 tests/test_*
 !tests/*.nim
+!tests/*.sh
 *.js
 result
 
 # Repro development environment cache
 .repro/
 .nimcache/
+tests/macro_sourcemap_*.json
