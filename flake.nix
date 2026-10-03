@@ -73,6 +73,7 @@
             packages = with pkgs; [
               nim
               nimble
+              bash
               just
               nodejs
               nixfmt-rfc-style
