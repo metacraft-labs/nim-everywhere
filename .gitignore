@@ -14,3 +14,6 @@ result
 .repro/
 .nimcache/
 tests/macro_sourcemap_*.json
+
+# Dev-shell node_modules link (store path; never committed)
+node_modules
