@@ -6,4 +6,4 @@ optimal = false
 inputs_digest = "fnv1a64:34996b39dde0fb3d"
 variants = []
 packages = [{ name = "gcc", version = "12.0.0", source = "gcc", selection = "selected" }, { name = "nim", version = "2.0.0", source = "nim", selection = "selected" }, { name = "nim_everywhere", version = "0.1.0", source = "nim_everywhere", selection = "selected" }]
-deps = [{ name = "nim-everywhere", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/nim-everywhere", ref = "agents-to-dev-2026-10-03", revision = "e2448db6feea3e16462b4a934fee81ba1103a89d", integrity = "git-sha1:e2448db6feea3e16462b4a934fee81ba1103a89d", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
+deps = [{ name = "nim-everywhere", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/nim-everywhere", ref = "agents-to-dev-2026-10-03", revision = "8d1b56a567f7a867b29ec7f484b9e55f5168c114", integrity = "git-sha1:8d1b56a567f7a867b29ec7f484b9e55f5168c114", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
