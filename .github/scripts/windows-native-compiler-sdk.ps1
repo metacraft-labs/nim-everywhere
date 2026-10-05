@@ -55,8 +55,23 @@ $binary = Join-Path $root 'native_header_link_probe.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Native SDK header/link probe failed' }
 $output = (& $binary).Trim()
 if ($LASTEXITCODE -ne 0 -or $output -ne 'native-sdk-ok') { throw 'Native SDK runtime probe failed' }
-$proof = [ordered]@{ immutableSource=$revision; sourceHashes=$files; root=$root; archiveSha256=$pin['GCC_WINLIBS_SHA256']; compilers=$records; nativeProbeSha256=(Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash; nativeProbeOutput=$output; scope='Native compiler provisioning; original monitored actions remain required' }
+$justArchive = Join-Path $root 'just-1.51.0-windows-x64.zip'
+$justArchiveSha256 = '09d1138b6845e73f04bff5e26be3f57663bddca25e36fe6241d28a5aa310b64e'
+Invoke-WebRequest -Uri 'https://github.com/casey/just/releases/download/1.51.0/just-1.51.0-x86_64-pc-windows-msvc.zip' -OutFile $justArchive
+Assert-FileSha256 -Path $justArchive -Expected $justArchiveSha256
+$justRoot = Join-Path $root 'just'
+Expand-Archive -LiteralPath $justArchive -DestinationPath $justRoot
+$justExe = Join-Path $justRoot 'just.exe'
+$justBytes = [System.IO.File]::ReadAllBytes($justExe)
+if ($justBytes.Length -lt 64 -or $justBytes[0] -ne 77 -or $justBytes[1] -ne 90) { throw 'Invalid native just PE' }
+$justOffset = [BitConverter]::ToInt32($justBytes, 60)
+if ($justOffset -lt 0 -or $justOffset + 6 -gt $justBytes.Length -or [BitConverter]::ToUInt32($justBytes, $justOffset) -ne 17744 -or [BitConverter]::ToUInt16($justBytes, $justOffset + 4) -ne 34404) { throw 'Non-AMD64 just executable' }
+$justVersion = (& $justExe --version).Trim()
+if ($LASTEXITCODE -ne 0 -or $justVersion -ne 'just 1.51.0') { throw 'Wrong native just version' }
+$justIdentity = [ordered]@{ path=$justExe; sha256=(Get-FileHash -LiteralPath $justExe -Algorithm SHA256).Hash; peMachine='0x8664'; version=$justVersion; archiveSha256=$justArchiveSha256 }
+$proof = [ordered]@{ immutableSource=$revision; sourceHashes=$files; root=$root; archiveSha256=$pin['GCC_WINLIBS_SHA256']; compilers=$records; just=$justIdentity; nativeProbeSha256=(Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash; nativeProbeOutput=$output; scope='Native compiler provisioning; original monitored actions remain required' }
 $directory = Join-Path $env:GITHUB_WORKSPACE '.repro\windows-native-provenance'
 New-Item -ItemType Directory -Force -Path $directory | Out-Null
 $proof | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $directory 'native-compiler-sdk.json')
 Add-Content -LiteralPath $env:GITHUB_PATH -Value $bin
+Add-Content -LiteralPath $env:GITHUB_PATH -Value $justRoot
