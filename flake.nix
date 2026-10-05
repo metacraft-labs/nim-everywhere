@@ -3,6 +3,10 @@
 
   inputs = {
     nixos-modules.url = "github:metacraft-labs/devops-modules";
+    standard-hook-source = {
+      url = "github:metacraft-labs/devops-modules/c8ef41d446e211892fe9775182b43d5d517554ac";
+      flake = false;
+    };
     nixpkgs.follows = "nixos-modules/nixpkgs-unstable";
     flake-parts.follows = "nixos-modules/flake-parts";
     git-hooks.follows = "nixos-modules/git-hooks-nix";
@@ -54,30 +58,47 @@
 
           preCommit = git-hooks.lib.${system}.run {
             src = ./.;
-            hooks = {
-              check-added-large-files.enable = true;
-              check-merge-conflicts.enable = true;
-              lint = {
-                enable = true;
-                name = "just lint";
-                entry = "just lint";
-                language = "system";
-                pass_filenames = false;
+            hooks =
+              (import "${inputs.standard-hook-source}/git-hooks/standard-hooks.nix" {
+                inherit pkgs;
+                lib = pkgs.lib;
+                src = inputs.standard-hook-source;
+              })
+              // {
+                check-merge-conflicts.enable = true;
+                lint = {
+                  enable = true;
+                  name = "just lint";
+                  entry = "just lint";
+                  extraPackages = with pkgs; [
+                    bash
+                    coreutils
+                    just
+                    nim
+                    nixfmt-rfc-style
+                  ];
+                  language = "system";
+                  pass_filenames = false;
+                };
               };
-            };
           };
         in
         {
           checks.pre-commit = preCommit;
           devShells.default = pkgs.mkShell {
-            packages = with pkgs; [
-              nim
-              nimble
-              bash
-              just
-              nodejs
-              nixfmt-rfc-style
-            ];
+            packages =
+              with pkgs;
+              [
+                nim
+                nimble
+                bash
+                just
+                nodejs
+                nixfmt-rfc-style
+                pre-commit
+                python3
+              ]
+              ++ preCommit.enabledPackages;
             shellHook = ''
               ${ownRepoOnly preCommit.shellHook}
             '';
