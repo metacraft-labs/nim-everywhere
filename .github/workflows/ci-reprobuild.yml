@@ -136,6 +136,11 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/bind-selected-native-nim.ps1
 
+      - name: Provision the owning native Windows Node
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./.github/scripts/setup-native-node.ps1
+
       - name: just build (cross-check)
         # Re-runs the legacy `just build` path inside the same env so
         # we catch silent divergences between `repro build` outputs
