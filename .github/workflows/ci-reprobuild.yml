@@ -131,6 +131,11 @@ jobs:
         # Materialises the `test` collection.
         run: dev-exec repro test ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
 
+      - name: Bind the same selected native Nim for x64 crosschecks
+        if: runner.os == 'Windows' && matrix.arch == 'x64'
+        shell: pwsh
+        run: ./.github/scripts/bind-selected-native-nim.ps1
+
       - name: just build (cross-check)
         # Re-runs the legacy `just build` path inside the same env so
         # we catch silent divergences between `repro build` outputs
