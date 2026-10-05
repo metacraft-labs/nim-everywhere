@@ -112,7 +112,7 @@ jobs:
 
       - name: Record native Windows executable provenance
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: dev-exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .github/scripts/windows-native-provenance.ps1
 
       - name: repro build
