@@ -140,6 +140,12 @@ jobs:
       - name: just test (cross-check)
         run: dev-exec just test
 
+      - name: Observe native Windows timer clocks after failure
+        if: failure() && runner.os == 'Windows' && matrix.arch == 'x64'
+        # Diagnostic only; the original required suite failure remains.
+        shell: pwsh
+        run: dev-exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .github/scripts/windows-timer-observation.ps1
+
       # Diagnostics on failure. Three things below are load-bearing:
       #
       # 1. `include-hidden-files: true`. actions/upload-artifact@v4 defaults this
@@ -182,6 +188,9 @@ jobs:
           path: |
             .repro/build/*/build-failure-report.json
             .repro/windows-native-provenance/*.json
+            .repro/windows-timer-observation/*.json
+            .repro/windows-timer-observation/native-output.log
+            .repro/windows-timer-observation/nimcache/*.json
             .repro/build/*/*-tool-identities.inspect.json
             build/nimcache/**/*.json
             .repro/build/*/build-engine-cache/actions/
