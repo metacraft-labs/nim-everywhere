@@ -53,6 +53,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_PARAMETERS: ${{ env.GIT_CONFIG_PARAMETERS != '' && format('{0} ', env.GIT_CONFIG_PARAMETERS) || '' }}'core.autocrlf'='false' 'core.eol'='lf' 'core.attributesfile'=''
 
       # Mint a GitHub App installation token via the CI Token Provider
       # app so the reprobuild flake/sibling steps can clone private
@@ -114,6 +116,16 @@ jobs:
         if: runner.os == 'Windows' && matrix.arch == 'x64'
         shell: pwsh
         run: ./.github/scripts/windows-native-compiler-sdk.ps1
+
+      - name: Provision genuine native Windows ARM compiler and frontend
+        if: matrix.os == 'windows' && matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $helperRoot = Join-Path $env:RUNNER_TEMP ('everywhere-arm-helper-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $helperRoot -ErrorAction Stop | Out-Null
+          $helper = Join-Path $helperRoot 'native-owned-path.ps1'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/metacraft-labs/nim-agents/f541453274f3adda7d01f8e7cdfcf0f9b9c9b88c/ci/native-python-owned-path.ps1' -OutFile $helper -UserAgent 'Metacraft-Everywhere-ARM-Provider/1.0'
+          & ./.github/scripts/windows-native-arm-sdk.ps1 -OwnedPathHelper $helper -SourceRoot $env:GITHUB_WORKSPACE -SourceRevision $env:GITHUB_SHA
 
       - name: Record native Windows executable provenance
         if: runner.os == 'Windows'
@@ -198,6 +210,9 @@ jobs:
           path: |
             .repro/build/*/build-failure-report.json
             .repro/windows-native-provenance/*.json
+            ${{ runner.temp }}/everywhere-arm-sdk-*/provider*.json
+            ${{ runner.temp }}/everywhere-arm-sdk-*/*.stdout
+            ${{ runner.temp }}/everywhere-arm-sdk-*/*.stderr
             .repro/windows-timer-observation/*.json
             .repro/windows-timer-observation/native-output.log
             .repro/windows-timer-observation/nimcache/*.json

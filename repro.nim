@@ -163,7 +163,7 @@ package nim_everywhere:
     # shell furnishes a 2.2.x toolchain). Sufficient for the path-mode
     # resolver under ``nix develop``.
     "nim >=2.0 <3.0"
-    when defined(macosx):
+    when defined(macosx) or (defined(windows) and defined(arm64)):
       "clang >=14"
     else:
       "gcc >=12"
@@ -201,7 +201,7 @@ package nim_everywhere:
         actionId = "nim_everywhere.test_build." & stem)
       # Nim invokes its platform C backend; name it on this actual compile
       # action so action-scoped tool provisioning includes its executable.
-      when defined(macosx):
+      when defined(macosx) or (defined(windows) and defined(arm64)):
         appendRegisteredActionToolIdentityRefs(edge.action.id, ["clang"])
       else:
         appendRegisteredActionToolIdentityRefs(edge.action.id, ["gcc"])
