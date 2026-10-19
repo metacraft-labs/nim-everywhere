@@ -132,13 +132,13 @@ proc rsaSpkiDer*(modulus, exponent: string): string =
 
 when defined(js):
   proc verifyRs256*(signingInput, signature, modulusB64Url,
-                    exponentB64Url: string): Rs256Verdict =
+                    exponentB64Url: string): Rs256Verdict {.gcsafe.} =
     ## Always `rs256Unavailable` on this backend. See the header: the browser's
     ## RSASSA-PKCS1-v1_5 is asynchronous and cannot be reached through a
     ## synchronous seam, so a JS caller uses `crypto.subtle` directly.
     rs256Unavailable
 
-  proc rs256IsAvailable*(): bool = false
+  proc rs256IsAvailable*(): bool {.gcsafe.} = false
 
 else:
   import std/dynlib
@@ -175,22 +175,28 @@ else:
       ["libcrypto.so.3", "libcrypto.so.1.1", "libcrypto.so"]
 
   type
+    # `gcsafe` ON THE PROC TYPES, not just on the procs that call through them.
+    # A `{.gcsafe.}` proc may not call through a proc-typed variable whose type
+    # is not itself gcsafe, so marking only the callers leaves
+    # "'verifyRs256' is not GC-safe as it calls 'verifyFinal'". These are
+    # `cdecl` C entry points with no closure environment, so the annotation is
+    # a statement of fact rather than an assertion.
     EvpPkey = pointer
     EvpMdCtx = pointer
     EvpMd = pointer
 
     D2iPubkeyProc = proc (a: ptr EvpPkey; pp: ptr ptr uint8;
-                          length: clong): EvpPkey {.cdecl.}
-    PkeyFreeProc = proc (k: EvpPkey) {.cdecl.}
-    MdCtxNewProc = proc (): EvpMdCtx {.cdecl.}
-    MdCtxFreeProc = proc (c: EvpMdCtx) {.cdecl.}
-    Sha256Proc = proc (): EvpMd {.cdecl.}
+                          length: clong): EvpPkey {.cdecl, gcsafe.}
+    PkeyFreeProc = proc (k: EvpPkey) {.cdecl, gcsafe.}
+    MdCtxNewProc = proc (): EvpMdCtx {.cdecl, gcsafe.}
+    MdCtxFreeProc = proc (c: EvpMdCtx) {.cdecl, gcsafe.}
+    Sha256Proc = proc (): EvpMd {.cdecl, gcsafe.}
     VerifyInitProc = proc (ctx: EvpMdCtx; pctx: pointer; typ: EvpMd;
-                           e: pointer; pkey: EvpPkey): cint {.cdecl.}
+                           e: pointer; pkey: EvpPkey): cint {.cdecl, gcsafe.}
     DigestUpdateProc = proc (ctx: EvpMdCtx; data: pointer;
-                             len: csize_t): cint {.cdecl.}
+                             len: csize_t): cint {.cdecl, gcsafe.}
     VerifyFinalProc = proc (ctx: EvpMdCtx; sig: pointer;
-                            siglen: csize_t): cint {.cdecl.}
+                            siglen: csize_t): cint {.cdecl, gcsafe.}
 
   var
     libTried = false
@@ -204,7 +210,7 @@ else:
     digestUpdate: DigestUpdateProc
     verifyFinal: VerifyFinalProc
 
-  proc bindAll(): bool =
+  proc bindAll(): bool {.gcsafe.} =
     ## Every symbol or none. A partial binding is worse than no binding: it
     ## would pass the availability check and then call through a nil pointer.
     template need(dest, T, name: untyped): untyped =
@@ -224,7 +230,27 @@ else:
     need(verifyFinal, VerifyFinalProc, "EVP_DigestVerifyFinal")
     true
 
-  proc loadCrypto(): bool =
+  proc loadCrypto(): bool {.gcsafe.} =
+    ## `{.gcsafe.}` OVER MODULE GLOBALS, AND THE REASON IS WRITTEN HERE RATHER
+    ## THAN ASSUMED.
+    ##
+    ## The bound symbols have to live somewhere that survives the call, and a
+    ## dynlib binding is process-wide by nature, so they are module globals.
+    ## Nim therefore infers every caller as not-GC-safe, and that inference
+    ## propagates: `verifyRs256` -> a relying party's `verifyIdToken` -> an
+    ## `{.async.}` request handler, which fails to compile with
+    ## "'handler (Async)' is not GC-safe".
+    ##
+    ## That is not hypothetical. It broke isonim-platform's `api-server` build
+    ## the first time this module was consumed from one, while that repo's unit
+    ## suites and its sealed test derivation both stayed green — they compile
+    ## the module, not the async handler.
+    ##
+    ## The globals are WRITE-ONCE AND THEN READ-ONLY: `libTried` latches, the
+    ## handle and the eight symbols are assigned together and never reassigned,
+    ## and every one is a pointer into a library that stays mapped for the life
+    ## of the process. A concurrent first call can at worst open the same
+    ## library twice and bind the same addresses over themselves.
     if libTried:
       return lib != nil and d2iPubkey != nil
     libTried = true
@@ -244,14 +270,14 @@ else:
         lib = nil
     false
 
-  proc rs256IsAvailable*(): bool =
+  proc rs256IsAvailable*(): bool {.gcsafe.} =
     ## Whether a verification could run at all. A caller should ask before
     ## reporting a token as invalid, so that "your session is not valid" is
     ## never shown for "this build cannot check signatures".
     loadCrypto()
 
   proc verifyRs256*(signingInput, signature, modulusB64Url,
-                    exponentB64Url: string): Rs256Verdict =
+                    exponentB64Url: string): Rs256Verdict {.gcsafe.} =
     ## `signingInput` and `signature` are RAW bytes — the JWS signing input as
     ## received and the decoded signature. The key halves are base64url, as the
     ## JWKS publishes them.

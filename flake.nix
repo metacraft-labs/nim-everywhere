@@ -3,6 +3,10 @@
 
   inputs = {
     nixos-modules.url = "github:metacraft-labs/devops-modules";
+    standard-hook-source = {
+      url = "github:metacraft-labs/devops-modules/c8ef41d446e211892fe9775182b43d5d517554ac";
+      flake = false;
+    };
     nixpkgs.follows = "nixos-modules/nixpkgs-unstable";
     flake-parts.follows = "nixos-modules/flake-parts";
     git-hooks.follows = "nixos-modules/git-hooks-nix";
@@ -27,33 +31,76 @@
       perSystem =
         { pkgs, system, ... }:
         let
+          # git-hooks.nix installs `.pre-commit-config.yaml` and git hooks into
+          # `git rev-parse --show-toplevel` of the directory the shell is entered
+          # from, so `nix develop /path/to/<this repo>` run inside another checkout
+          # would plant this repository's hooks there. `ownRepoOnly` runs a snippet
+          # only when that toplevel is this repository, recognised by a `flake.nix`
+          # identical to the one this shell was evaluated from; anything it cannot
+          # establish counts as another repository, so it fails safe.
+          # tests/test_dev_shell_writes_nothing_elsewhere.sh
+          ownRepoOnly = script: ''
+            _own_repo_root="$(${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null || true)"
+            if [ -n "$_own_repo_root" ] && [ -f "$_own_repo_root/flake.nix" ] \
+              && [ "$(${pkgs.coreutils}/bin/sha256sum "$_own_repo_root/flake.nix" | ${pkgs.coreutils}/bin/cut -d' ' -f1)" \
+                = "${builtins.hashFile "sha256" ./flake.nix}" ]; then
+            ${script}
+            # git-hooks.nix's installer leaves core.hooksPath as the RELATIVE
+            # `.git/hooks`, in the config every worktree shares. A linked worktree
+            # cannot resolve it (there `.git` is a file), so git silently runs no
+            # hooks there. Point it at the common hooks directory instead.
+            if [ "$(${pkgs.git}/bin/git config --local --get core.hooksPath 2>/dev/null)" = .git/hooks ]; then
+              ${pkgs.git}/bin/git config --local core.hooksPath "$(${pkgs.git}/bin/git rev-parse --path-format=absolute --git-common-dir)/hooks"
+            fi
+            fi
+            unset _own_repo_root
+          '';
+
           preCommit = git-hooks.lib.${system}.run {
             src = ./.;
-            hooks = {
-              check-added-large-files.enable = true;
-              check-merge-conflicts.enable = true;
-              lint = {
-                enable = true;
-                name = "just lint";
-                entry = "just lint";
-                language = "system";
-                pass_filenames = false;
+            hooks =
+              (import "${inputs.standard-hook-source}/git-hooks/standard-hooks.nix" {
+                inherit pkgs;
+                lib = pkgs.lib;
+                src = inputs.standard-hook-source;
+              })
+              // {
+                check-merge-conflicts.enable = true;
+                lint = {
+                  enable = true;
+                  name = "just lint";
+                  entry = "just lint";
+                  extraPackages = with pkgs; [
+                    bash
+                    coreutils
+                    just
+                    nim
+                    nixfmt-rfc-style
+                  ];
+                  language = "system";
+                  pass_filenames = false;
+                };
               };
-            };
           };
         in
         {
           checks.pre-commit = preCommit;
           devShells.default = pkgs.mkShell {
-            packages = with pkgs; [
-              nim
-              nimble
-              just
-              nodejs
-              nixfmt-rfc-style
-            ];
+            packages =
+              with pkgs;
+              [
+                nim
+                nimble
+                bash
+                just
+                nodejs
+                nixfmt-rfc-style
+                pre-commit
+                python3
+              ]
+              ++ preCommit.enabledPackages;
             shellHook = ''
-              ${preCommit.shellHook}
+              ${ownRepoOnly preCommit.shellHook}
             '';
           };
           packages.default = pkgs.stdenvNoCC.mkDerivation {
