@@ -87,7 +87,10 @@ when defined(js):
     message
 
 else:
-  when asyncBackend in ["", "asyncdispatch"]:
+  # ngx-isonim pumps std/asyncdispatch from its worker's event loop
+  # (ngx-isonim/src/async_loop.nim), so its platform futures and timers use
+  # that same dispatcher. Its faststreams backend remains independently nginx.
+  when asyncBackend in ["", "asyncdispatch", "nginx"]:
     import std/asyncdispatch
     export asyncdispatch
     type PlatformFuture*[T] = Future[T]
@@ -266,13 +269,13 @@ else:
 
   else:
     {.fatal: "unrecognized -d:asyncBackend=" & asyncBackend &
-             " (expected: asyncdispatch | chronos | none).".}
+             " (expected: asyncdispatch | nginx | chronos | none).".}
 
 proc drainPlatformCallbacks*() =
   when defined(js):
     drainCallbacks()
   else:
-    when asyncBackend in ["", "asyncdispatch"]:
+    when asyncBackend in ["", "asyncdispatch", "nginx"]:
       when platformIsWasm:
         # The WASM arm. `poll(0)` has no meaning on a linear-memory target;
         # see `drainWasmDispatcher` above for what replaces it and why.

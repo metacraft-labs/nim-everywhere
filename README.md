@@ -69,3 +69,15 @@ every primitive synchronously without waiting on the OS clock. See
 direnv exec /home/zahary/metacraft/nim-everywhere just test
 direnv exec /home/zahary/metacraft/nim-everywhere just test-js
 ```
+
+### Platform interception
+
+Import `nim_everywhere/backend` to install a `PlatformBackendHook` for
+monotonic reads, timers, and HTTP requests. Install `nil` to restore the
+platform defaults. An installed `FakeAsyncContext` takes precedence over
+time hooks. Implementations can delegate through `sleepForRaw`,
+`scheduleAtRaw`, and `fetchHttpRaw` without recursively entering the hook.
+Cancellation is forwarded to the hook and prevents queued timer delivery.
+
+The `nginx` selector uses std/asyncdispatch, which ngx-isonim pumps from its
+worker event loop. It does not select a separate or blocking event loop.

@@ -20,6 +20,7 @@ build-js:
 test: test-native test-js test-async-matrix test-time-matrix
 
 test-native:
+    nim c -r --path:src tests/test_backend_hook.nim
     nim c -r --path:src tests/test_platform_smoke.nim
     nim c -r --path:src tests/test_async_http.nim
     nim c -r --path:src tests/test_nimcache_is_worktree_local.nim
@@ -31,6 +32,7 @@ test-native:
     nim c -r -d:nimEverywhereCryptoLib=/nonexistent/libcrypto.so.3 --path:src --nimcache:.nimcache/rs256-override tests/test_rs256.nim
 
 test-js:
+    bash tools/nim-js-test-gate.sh --path:src tests/test_backend_hook.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_async_http.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_rs256.nim
@@ -68,7 +70,7 @@ test-async-none:
     nim c -r -d:asyncBackend=none --path:src tests/test_async_backend.nim
     nim c -r -d:asyncBackend=none --path:src tests/test_async_http.nim
 
-test-async-matrix: test-async-default test-async-asyncdispatch test-async-chronos test-async-none
+test-async-matrix: test-async-nginx test-async-default test-async-asyncdispatch test-async-chronos test-async-none
 
 # Time-facade matrix — NE-Time-M0. Exercises the expanded time facade
 # (monotonicNowMs, withTimeout, scheduleAt, scheduleEvery, cancelTimer)
@@ -176,3 +178,10 @@ bump-version version:
 test-dev-shell:
     bash tests/test_dev_shell_writes_nothing_elsewhere.sh
     bash tests/test_dev_shell_linked_worktree.sh
+
+# The nginx worker pumps the same std dispatcher as asyncdispatch.
+test-async-nginx:
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_async_backend.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_fake_time.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_time_facade.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_backend_hook.nim
