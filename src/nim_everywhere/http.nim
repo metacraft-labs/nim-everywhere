@@ -2,6 +2,26 @@ import ./raw_nondet
 export raw_nondet
 
 import nim_everywhere/[async_compat, platform, backend]
+when defined(js):
+  import std/jsffi
+
+  proc browserFetch(url: cstring; init: JsObject): PlatformFuture[JsObject]
+      {.importjs: "fetch(#, #)", tags: [RawNondet].}
+
+  proc fetchBrowserResponseRaw*(access: RawBackendAccess; url: cstring;
+      init: JsObject): PlatformFuture[JsObject] {.tags: [RawNondet].} =
+    ## Browser backend primitive: return the original fetch Promise/Response,
+    ## before any buffered facade reads its body or projects its metadata.
+    ## No observer, extra read, continuation or rejection conversion is added.
+    browserFetch(url, init)
+
+  when defined(isonimStrictNondet):
+    proc fetchBrowserResponseRaw*(url: cstring; init: JsObject): PlatformFuture[JsObject]
+        {.error: "isonimStrictNondet: raw platform binding fetchBrowserResponseRaw; use the nondeterminism seam".}
+  else:
+    proc fetchBrowserResponseRaw*(url: cstring; init: JsObject): PlatformFuture[JsObject]
+        {.tags: [RawNondet].} =
+      fetchBrowserResponseRaw(rawBackendAccess, url, init)
 
 type HttpAsyncTransport* = proc(request: HttpRequest): PlatformFuture[HttpResponse] {.closure.}
 
@@ -37,12 +57,16 @@ proc fetchHttpRaw*(access: RawBackendAccess; request: HttpRequest): PlatformFutu
           for i, name in headerNames:
             response.headers.add(HttpHeader(name: $name, value: $headerValues[i]))
           resolve(response)
+        var init: JsObject
         {.emit: """
           var headers = {};
           for (var i = 0; i < `names`.length; i++) headers[`names`[i]] = `values`[i];
-          var init = { method: `methodName`, headers: headers };
-          if (`body`.length > 0) init.body = `body`;
-          fetch(`url`, init).then(function(resp) {
+          `init` = { method: `methodName`, headers: headers };
+          if (`body`.length > 0) `init`.body = `body`;
+        """.}
+        let pending = fetchBrowserResponseRaw(access, url, init)
+        {.emit: """
+          `pending`.then(function(resp) {
             return resp.text().then(function(text) {
               var hn = [], hv = [];
               resp.headers.forEach(function(v,k) { hn.push(k); hv.push(v); });

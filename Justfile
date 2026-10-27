@@ -31,7 +31,7 @@ test-native:
     # check; the same suite has to stay green through the fallback.
     nim c -r -d:nimEverywhereCryptoLib=/nonexistent/libcrypto.so.3 --path:src --nimcache:.nimcache/rs256-override tests/test_rs256.nim
 
-test-js:
+test-js: test-browser-response test-browser-response-mutants
     bash tools/nim-js-test-gate.sh --path:src tests/test_backend_hook.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_async_http.nim
@@ -185,3 +185,17 @@ test-async-nginx:
     nim c -r -d:asyncBackend=nginx --path:src tests/test_fake_time.nim
     nim c -r -d:asyncBackend=nginx --path:src tests/test_time_facade.nim
     nim c -r -d:asyncBackend=nginx --path:src tests/test_backend_hook.nim
+
+# Native fetch/Response/stream integration in Node; Chromium consumer coverage
+# exercises the same primitive beneath both buffered public facades.
+test-browser-response:
+    nim js --path:src tests/browser_response_fixture.nim
+    node tests/test_browser_response.mjs
+    nim js -d:isonimStrictNondet --path:src --out:tests/browser_response_fixture_strict.js tests/browser_response_fixture.nim
+    RAW_RESPONSE_FIXTURE=tests/browser_response_fixture_strict.js node tests/test_browser_response.mjs
+    nim js -d:unqualifiedRawResponse --path:src --out:tests/browser_response_fixture_legacy.js tests/browser_response_fixture.nim
+    RAW_RESPONSE_FIXTURE=tests/browser_response_fixture_legacy.js node tests/test_browser_response.mjs
+    bash tests/check_browser_response_strict.sh
+
+test-browser-response-mutants:
+    node tests/test_browser_response_mutations.mjs

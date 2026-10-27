@@ -79,5 +79,13 @@ time hooks. Implementations can delegate through `sleepForRaw`,
 `scheduleAtRaw`, and `fetchHttpRaw` without recursively entering the hook.
 Cancellation is forwarded to the hook and prevents queued timer delivery.
 
+Browser backend implementations can delegate through
+`fetchBrowserResponseRaw(rawBackendAccess, url, init)` before their buffered
+response projection. It returns the original platform fetch Promise and
+Response, with no extra continuation, body read, clone or error conversion.
+This raw implementation primitive does not install an observer or change the
+public `HttpRequest`/`HttpResponse` contract. Strict builds reject its legacy
+overload without the explicit raw access argument, as for other raw primitives.
+
 The `nginx` selector uses std/asyncdispatch, which ngx-isonim pumps from its
 worker event loop. It does not select a separate or blocking event loop.
