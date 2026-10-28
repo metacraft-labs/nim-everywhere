@@ -23,6 +23,62 @@ when defined(js):
         {.tags: [RawNondet].} =
       fetchBrowserResponseRaw(rawBackendAccess, url, init)
 
+
+when defined(js):
+  type HttpRequestPartsRaw* = object
+    ## Fixed browser request conversion, prepared before Promise construction.
+    url*: cstring
+    methodName, body: cstring
+    names, values: seq[cstring]
+
+  proc prepareHttpRequestRaw*(access: RawBackendAccess;
+      request: HttpRequest): HttpRequestPartsRaw {.tags: [RawNondet].} =
+    ## Convert a buffered request without moving conversion errors into a Promise.
+    result.url = request.url.cstring
+    result.methodName = request.httpMethod.httpMethodName().cstring
+    result.body = request.body.cstring
+    for header in request.headers:
+      result.names.add(header.name.cstring)
+      result.values.add(header.value.cstring)
+
+  proc buildHttpRequestInitRaw*(access: RawBackendAccess;
+      parts: HttpRequestPartsRaw): JsObject {.tags: [RawNondet].} =
+    ## Build inside the caller's Promise executor, retaining native assignment
+    ## order, duplicate replacement and omission of an empty buffered body.
+    let names = parts.names
+    let values = parts.values
+    let methodName = parts.methodName
+    let body = parts.body
+    {.emit: """
+      var headers = {};
+      for (var i = 0; i < `names`.length; i++) headers[`names`[i]] = `values`[i];
+      `result` = { method: `methodName`, headers: headers };
+      if (`body`.length > 0) `result`.body = `body`;
+    """.}
+
+  proc projectHttpResponseRaw*(access: RawBackendAccess;
+      pending: PlatformFuture[JsObject];
+      resolve: proc(response: HttpResponse)) {.tags: [RawNondet].} =
+    ## Consume once and complete the existing buffered result. Returning no new
+    ## Promise avoids adding a continuation between projection and completion.
+    let finish = proc(status: int; text: cstring;
+                      headerNames, headerValues: seq[cstring]) =
+      var response = HttpResponse(status: status, body: $text)
+      for i, name in headerNames:
+        response.headers.add(HttpHeader(name: $name, value: $headerValues[i]))
+      resolve(response)
+    {.emit: """
+      `pending`.then(function(resp) {
+        return resp.text().then(function(text) {
+          var hn = [], hv = [];
+          resp.headers.forEach(function(v,k) { hn.push(k); hv.push(v); });
+          `finish`(resp.status, text, hn, hv);
+        });
+      }).catch(function(error) {
+        `finish`(599, String(error && error.message || error), [], []);
+      });
+    """.}
+
 type HttpAsyncTransport* = proc(request: HttpRequest): PlatformFuture[HttpResponse] {.closure.}
 
 proc response*(status: int; body = ""; headers: seq[HttpHeader] = @[]): HttpResponse =
@@ -43,39 +99,11 @@ proc fetchHttpRaw*(access: RawBackendAccess; request: HttpRequest): PlatformFutu
   {.cast(tags: []).}:
 
     when defined(js):
-      let url = request.url.cstring
-      let methodName = request.httpMethod.httpMethodName().cstring
-      let body = request.body.cstring
-      var names, values: seq[cstring]
-      for header in request.headers:
-        names.add(header.name.cstring)
-        values.add(header.value.cstring)
+      let parts = prepareHttpRequestRaw(access, request)
       result = newPromise proc(resolve: proc(response: HttpResponse)) =
-        let finish = proc(status: int; text: cstring;
-                          headerNames, headerValues: seq[cstring]) =
-          var response = HttpResponse(status: status, body: $text)
-          for i, name in headerNames:
-            response.headers.add(HttpHeader(name: $name, value: $headerValues[i]))
-          resolve(response)
-        var init: JsObject
-        {.emit: """
-          var headers = {};
-          for (var i = 0; i < `names`.length; i++) headers[`names`[i]] = `values`[i];
-          `init` = { method: `methodName`, headers: headers };
-          if (`body`.length > 0) `init`.body = `body`;
-        """.}
-        let pending = fetchBrowserResponseRaw(access, url, init)
-        {.emit: """
-          `pending`.then(function(resp) {
-            return resp.text().then(function(text) {
-              var hn = [], hv = [];
-              resp.headers.forEach(function(v,k) { hn.push(k); hv.push(v); });
-              `finish`(resp.status, text, hn, hv);
-            });
-          }).catch(function(error) {
-            `finish`(599, String(error && error.message || error), [], []);
-          });
-        """.}
+        let init = buildHttpRequestInitRaw(access, parts)
+        let pending = fetchBrowserResponseRaw(access, parts.url, init)
+        projectHttpResponseRaw(access, pending, resolve)
 
     else:
       newFailedFuture[HttpResponse]("native fetch transport is not attached")

@@ -31,7 +31,7 @@ test-native:
     # check; the same suite has to stay green through the fallback.
     nim c -r -d:nimEverywhereCryptoLib=/nonexistent/libcrypto.so.3 --path:src --nimcache:.nimcache/rs256-override tests/test_rs256.nim
 
-test-js: test-browser-response test-browser-response-mutants
+test-js: test-browser-response test-browser-response-mutants test-http-projection
     bash tools/nim-js-test-gate.sh --path:src tests/test_backend_hook.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_async_http.nim
@@ -199,3 +199,12 @@ test-browser-response:
 
 test-browser-response-mutants:
     node tests/test_browser_response_mutations.mjs
+
+# Full fixed HTTP composition must preserve the historical native Promise turns.
+test-http-projection:
+    nim js -d:extractedHttpComposition --path:src tests/http_projection_fixture.nim
+    node tests/test_http_projection.mjs
+    nim js -d:isonimStrictNondet -d:extractedHttpComposition --path:src --out:tests/http_projection_fixture_strict.js tests/http_projection_fixture.nim
+    HTTP_PROJECTION_FIXTURE=tests/http_projection_fixture_strict.js node tests/test_http_projection.mjs
+    bash tests/check_http_projection_effects.sh
+    node tests/test_http_projection_mutations.mjs

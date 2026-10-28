@@ -1,0 +1,478 @@
+{
+  "ready": {
+    "trace": [
+      "fetch",
+      "returned",
+      "text",
+      "turn1",
+      "turn2",
+      "turn3",
+      "body-ready",
+      "turn4",
+      "body-turn1",
+      "fulfilled",
+      "turn5",
+      "body-turn2",
+      "turn6",
+      "body-turn3",
+      "turn7",
+      "body-turn4",
+      "turn8",
+      "body-turn5",
+      "turn9",
+      "body-turn6",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 1,
+    "completions": 1,
+    "outcome": {
+      "status": 207,
+      "body": "ready",
+      "headers": [
+        [
+          "content-type",
+          "text/plain;charset=UTF-8"
+        ],
+        [
+          "x-a",
+          "a"
+        ],
+        [
+          "x-z",
+          "z"
+        ]
+      ]
+    }
+  },
+  "body": {
+    "trace": [
+      "fetch",
+      "returned",
+      "text",
+      "turn1",
+      "turn2",
+      "turn3",
+      "body-ready",
+      "turn4",
+      "body-turn1",
+      "fulfilled",
+      "turn5",
+      "body-turn2",
+      "turn6",
+      "body-turn3",
+      "turn7",
+      "body-turn4",
+      "turn8",
+      "body-turn5",
+      "turn9",
+      "body-turn6",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers",
+          "body"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": "payload"
+      }
+    ],
+    "reads": 1,
+    "completions": 1,
+    "outcome": {
+      "status": 207,
+      "body": "ready",
+      "headers": [
+        [
+          "content-type",
+          "text/plain;charset=UTF-8"
+        ],
+        [
+          "x-a",
+          "a"
+        ],
+        [
+          "x-z",
+          "z"
+        ]
+      ]
+    }
+  },
+  "throw": {
+    "trace": [
+      "fetch",
+      "returned",
+      "rejected",
+      "turn1",
+      "turn2",
+      "turn3",
+      "turn4",
+      "turn5",
+      "turn6",
+      "turn7",
+      "turn8",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 0,
+    "completions": 1,
+    "outcome": {
+      "same": true
+    }
+  },
+  "init-throw": {
+    "trace": [
+      "returned",
+      "rejected",
+      "turn1",
+      "turn2",
+      "turn3",
+      "turn4",
+      "turn5",
+      "turn6",
+      "turn7",
+      "turn8",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [],
+    "reads": 0,
+    "completions": 1,
+    "outcome": {
+      "same": true
+    }
+  },
+  "head-error": {
+    "trace": [
+      "fetch",
+      "returned",
+      "turn1",
+      "turn2",
+      "fulfilled",
+      "turn3",
+      "turn4",
+      "turn5",
+      "turn6",
+      "turn7",
+      "turn8",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 0,
+    "completions": 1,
+    "outcome": {
+      "status": 599,
+      "body": "native token",
+      "headers": []
+    }
+  },
+  "body-error": {
+    "trace": [
+      "fetch",
+      "returned",
+      "text",
+      "turn1",
+      "turn2",
+      "body-ready",
+      "turn3",
+      "body-turn1",
+      "turn4",
+      "body-turn2",
+      "turn5",
+      "body-turn3",
+      "fulfilled",
+      "turn6",
+      "body-turn4",
+      "turn7",
+      "body-turn5",
+      "turn8",
+      "body-turn6",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 1,
+    "completions": 1,
+    "outcome": {
+      "status": 599,
+      "body": "native token",
+      "headers": []
+    }
+  },
+  "projection-error": {
+    "trace": [
+      "fetch",
+      "returned",
+      "text",
+      "turn1",
+      "turn2",
+      "turn3",
+      "body-ready",
+      "turn4",
+      "body-turn1",
+      "turn5",
+      "body-turn2",
+      "turn6",
+      "body-turn3",
+      "fulfilled",
+      "turn7",
+      "body-turn4",
+      "turn8",
+      "body-turn5",
+      "turn9",
+      "body-turn6",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 1,
+    "completions": 1,
+    "outcome": {
+      "status": 599,
+      "body": "native token",
+      "headers": []
+    }
+  },
+  "text-throw": {
+    "trace": [
+      "fetch",
+      "returned",
+      "text",
+      "turn1",
+      "turn2",
+      "fulfilled",
+      "turn3",
+      "turn4",
+      "turn5",
+      "turn6",
+      "turn7",
+      "turn8",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 1,
+    "completions": 1,
+    "outcome": {
+      "status": 599,
+      "body": "native token",
+      "headers": []
+    }
+  },
+  "head-primitive": {
+    "trace": [
+      "fetch",
+      "returned",
+      "turn1",
+      "turn2",
+      "fulfilled",
+      "turn3",
+      "turn4",
+      "turn5",
+      "turn6",
+      "turn7",
+      "turn8",
+      "turn9",
+      "turn10",
+      "turn11",
+      "turn12",
+      "turn13",
+      "turn14"
+    ],
+    "calls": [
+      {
+        "url": "http://example.invalid/",
+        "method": "POST",
+        "keys": [
+          "method",
+          "headers"
+        ],
+        "headers": [
+          [
+            "x-z",
+            "last"
+          ],
+          [
+            "x-a",
+            "middle"
+          ]
+        ],
+        "body": null
+      }
+    ],
+    "reads": 0,
+    "completions": 1,
+    "outcome": {
+      "status": 599,
+      "body": "0",
+      "headers": []
+    }
+  }
+}
