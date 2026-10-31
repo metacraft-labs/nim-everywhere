@@ -20,6 +20,7 @@ build-js:
 test: test-native test-js test-async-matrix test-time-matrix
 
 test-native:
+    nim c -r --path:src tests/test_backend_hook.nim
     nim c -r --path:src tests/test_platform_smoke.nim
     nim c -r --path:src tests/test_async_http.nim
     nim c -r --path:src tests/test_nimcache_is_worktree_local.nim
@@ -30,7 +31,8 @@ test-native:
     # check; the same suite has to stay green through the fallback.
     nim c -r -d:nimEverywhereCryptoLib=/nonexistent/libcrypto.so.3 --path:src --nimcache:.nimcache/rs256-override tests/test_rs256.nim
 
-test-js:
+test-js: test-browser-response test-browser-response-mutants test-http-projection
+    bash tools/nim-js-test-gate.sh --path:src tests/test_backend_hook.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_platform_smoke.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_async_http.nim
     bash tools/nim-js-test-gate.sh --path:src tests/test_rs256.nim
@@ -68,7 +70,7 @@ test-async-none:
     nim c -r -d:asyncBackend=none --path:src tests/test_async_backend.nim
     nim c -r -d:asyncBackend=none --path:src tests/test_async_http.nim
 
-test-async-matrix: test-async-default test-async-asyncdispatch test-async-chronos test-async-none
+test-async-matrix: test-async-nginx test-async-default test-async-asyncdispatch test-async-chronos test-async-none
 
 # Time-facade matrix — NE-Time-M0. Exercises the expanded time facade
 # (monotonicNowMs, withTimeout, scheduleAt, scheduleEvery, cancelTimer)
@@ -175,3 +177,34 @@ bump-version version:
 # Runs `nix develop`, so it is not part of the in-shell test recipes.
 test-dev-shell:
     bash tests/test_dev_shell_writes_nothing_elsewhere.sh
+    bash tests/test_dev_shell_linked_worktree.sh
+
+# The nginx worker pumps the same std dispatcher as asyncdispatch.
+test-async-nginx:
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_async_backend.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_fake_time.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_time_facade.nim
+    nim c -r -d:asyncBackend=nginx --path:src tests/test_backend_hook.nim
+
+# Native fetch/Response/stream integration in Node; Chromium consumer coverage
+# exercises the same primitive beneath both buffered public facades.
+test-browser-response:
+    nim js --path:src tests/browser_response_fixture.nim
+    node tests/test_browser_response.mjs
+    nim js -d:isonimStrictNondet --path:src --out:tests/browser_response_fixture_strict.js tests/browser_response_fixture.nim
+    RAW_RESPONSE_FIXTURE=tests/browser_response_fixture_strict.js node tests/test_browser_response.mjs
+    nim js -d:unqualifiedRawResponse --path:src --out:tests/browser_response_fixture_legacy.js tests/browser_response_fixture.nim
+    RAW_RESPONSE_FIXTURE=tests/browser_response_fixture_legacy.js node tests/test_browser_response.mjs
+    bash tests/check_browser_response_strict.sh
+
+test-browser-response-mutants:
+    node tests/test_browser_response_mutations.mjs
+
+# Full fixed HTTP composition must preserve the historical native Promise turns.
+test-http-projection:
+    nim js -d:extractedHttpComposition --path:src tests/http_projection_fixture.nim
+    node tests/test_http_projection.mjs
+    nim js -d:isonimStrictNondet -d:extractedHttpComposition --path:src --out:tests/http_projection_fixture_strict.js tests/http_projection_fixture.nim
+    HTTP_PROJECTION_FIXTURE=tests/http_projection_fixture_strict.js node tests/test_http_projection.mjs
+    bash tests/check_http_projection_effects.sh
+    node tests/test_http_projection_mutations.mjs

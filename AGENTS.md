@@ -15,6 +15,8 @@ Structure:
 - `src/nim_everywhere/async_compat.nim`: `PlatformFuture[T]` aliasing,
   `onComplete` / `onCompleteVoid`, `newCompletedFuture`,
   `newFailedFuture`, `drainPlatformCallbacks`.
+- `src/nim_everywhere/backend.nim`: optional consumer-neutral platform hook;
+  FakeAsyncContext retains time precedence. Raw entry points avoid recursion.
 - `src/nim_everywhere/time.nim` (NE-Time-M0): the expanded time facade —
   `sleepFor`, `monotonicNowMs`, `withTimeout`, `scheduleAt`,
   `scheduleEvery`, `cancelTimer`, `TimerHandle`. Every primitive routes
@@ -27,7 +29,7 @@ Structure:
 - `src/nim_everywhere/http.nim`: cross-target HTTP transport.
 - `tests/`: deterministic native/JS smoke tests + backend matrix.
 
-Backend matrix (asyncdispatch / chronos / none / unset default) is
+Backend matrix (asyncdispatch / nginx / chronos / none / unset default) is
 exercised via `just test-async-matrix` and `just test-time-matrix`. The
 top-level `just test` includes both.
 
