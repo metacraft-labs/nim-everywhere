@@ -94,18 +94,30 @@ jobs:
         # setup-dev-env clones the siblings listed in .github/sibling-repos
         # (none for this pure-leaf library) at the
         # workspace-lock-pinned revisions before materialising the env.
-        uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
+        uses: metacraft-labs/metacraft-github-actions/setup-dev-env@e2b9947768dccce6de2687a495c8286df4d6de96
         with:
           env-flavor: reprobuild
           repro-from-source: ${{ runner.os != 'Windows' && 'true' || 'false' }}
-          repro-build-pin: "76659f5730ecf698b1963c656494d2cb66eb256d"
+          # Reprobuild v0.2.18. The engine reads the committed v3 lock; older
+          # engines fail with "unsupported lock schema ...v3 (expected ...v2)".
+          # Keep the bootstrap libraries at that engine's own flake-lock
+          # revisions (they apply to the POSIX from-source build).
+          repro-build-pin: 413830138a7a73293dfc551d623f7bf2cb0ab62c
+          repro-runquota-pin: 35b9dfe4af6e18f3f2a2242ece7cff330eb581e2
+          repro-io-mon-pin: 6fccd929cb09da0bfc0844b93ced9ffb1ac0f74f
+          repro-stackable-hooks-pin: 059c549306621e2f769adf75630b0b7f29018dca
           gh-token: ${{ steps.ci_token.outputs.token }}
+
+      - name: Verify CI engine reads the committed lock
+        if: runner.os == 'Linux'
+        shell: bash
+        run: dev-exec python3 tests/test_ci_engine_reads_committed_lock.py --reprobuild .reprobuild-src
 
       - name: Verify immutable source engine identity
         if: runner.os != 'Windows'
         run: |
           source_root="$GITHUB_WORKSPACE/.reprobuild-src"
-          test "$(git -C "$source_root" rev-parse HEAD)" = "76659f5730ecf698b1963c656494d2cb66eb256d"
+          test "$(git -C "$source_root" rev-parse HEAD)" = "413830138a7a73293dfc551d623f7bf2cb0ab62c"
           test -z "$(git -C "$source_root" status --porcelain)"
           test "$(command -v repro)" = "$source_root/build/bin/repro"
           git -C "$source_root" rev-parse HEAD
@@ -132,12 +144,26 @@ jobs:
         shell: pwsh
         run: dev-exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .github/scripts/windows-native-provenance.ps1
 
+      - name: Refresh authentication before repro build
+        uses: metacraft-labs/metacraft-github-actions/refresh-build-auth@bcd29c631ff01fbd0e577c5f96e5f9d5211fed26
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
+
       - name: repro build
         # Builds the conventional `build` collection declared in
         # `repro.nim`. Verifies the primary shipping artefact (the
         # recorder binary or extension) materialises through the
         # reprobuild engine identically to `just build`.
         run: dev-exec repro build ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
+
+      - name: Refresh authentication before repro test
+        uses: metacraft-labs/metacraft-github-actions/refresh-build-auth@bcd29c631ff01fbd0e577c5f96e5f9d5211fed26
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
 
       - name: repro test
         # Materialises the `test` collection.
@@ -153,11 +179,25 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/setup-native-node.ps1
 
+      - name: Refresh authentication before just build (cross-check)
+        uses: metacraft-labs/metacraft-github-actions/refresh-build-auth@bcd29c631ff01fbd0e577c5f96e5f9d5211fed26
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
+
       - name: just build (cross-check)
         # Re-runs the legacy `just build` path inside the same env so
         # we catch silent divergences between `repro build` outputs
         # and what the dev shell + Justfile produce today.
         run: dev-exec just build
+
+      - name: Refresh authentication before just test (cross-check)
+        uses: metacraft-labs/metacraft-github-actions/refresh-build-auth@bcd29c631ff01fbd0e577c5f96e5f9d5211fed26
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
 
       - name: just test (cross-check)
         run: dev-exec just test

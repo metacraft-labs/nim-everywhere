@@ -208,3 +208,9 @@ test-http-projection:
     HTTP_PROJECTION_FIXTURE=tests/http_projection_fixture_strict.js node tests/test_http_projection.mjs
     bash tests/check_http_projection_effects.sh
     node tests/test_http_projection_mutations.mjs
+
+# Compile each workflow-selected engine's real reader against the shipping lock.
+# Needs an adjacent Reprobuild Git checkout containing the selected revision
+# (or --reprobuild <dir> with a source tree of that revision) and python3.
+test-ci-engine-lock:
+    python3 tests/test_ci_engine_reads_committed_lock.py
