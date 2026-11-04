@@ -3,12 +3,14 @@
 Shared Nim platform seams for code that must compile on native and JavaScript backends.
 
 Commands:
+
 - `just build`: compile native and JS smoke targets.
 - `just test`: run native and JS smoke tests.
 - `just lint`: run Nim and Nix checks.
 - `just format`: format Nim and Nix sources.
 
 Structure:
+
 - `src/nim_everywhere.nim`: public export surface.
 - `src/nim_everywhere/async_compat.nim`: `PlatformFuture[T]` aliasing,
   `onComplete` / `onCompleteVoid`, `newCompletedFuture`,

@@ -106,3 +106,16 @@ block worktreeLocalNimcache:
   if rel.len > 0:
     cacheDir.add("/" & rel)
   switch("nimcache", cacheDir & "/" & project & suffix)
+
+# Genuine native Windows ARM C backend. The job-local selector names the
+# reviewed complete LLVM-MinGW provider; no gcc alias or ambient fallback.
+when defined(windows) and defined(arm64):
+  from std/os import isAbsolute
+  let nativeArmClang = getEnv("EVERYWHERE_NATIVE_ARM_CLANG")
+  if nativeArmClang.len == 0 or not isAbsolute(nativeArmClang):
+    raise newException(ValueError, "Missing absolute genuine Windows ARM Clang selector")
+  if not fileExists(nativeArmClang):
+    raise newException(ValueError, "Genuine Windows ARM Clang selector is not a file")
+  switch("cc", "clang")
+  switch("clang.exe", nativeArmClang)
+  switch("clang.linkerexe", nativeArmClang)

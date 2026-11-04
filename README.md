@@ -3,6 +3,7 @@
 `nim-everywhere` provides small platform seams for Nim libraries that target both native Nim and Nim JS from the same source.
 
 It currently exposes:
+
 - `NativeString`, native collection aliases, and conversion helpers for code
   that should avoid backend-specific string/container choices
 - async compatibility helpers for callback-based code that targets both
