@@ -4,7 +4,7 @@
   inputs = {
     nixos-modules.url = "github:metacraft-labs/devops-modules";
     standard-hook-source = {
-      url = "github:metacraft-labs/devops-modules/c8ef41d446e211892fe9775182b43d5d517554ac";
+      url = "github:metacraft-labs/devops-modules/f975046990ef695ba6037420de404eddd6514682";
       flake = false;
     };
     nixpkgs.follows = "nixos-modules/nixpkgs-unstable";

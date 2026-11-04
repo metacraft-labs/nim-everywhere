@@ -32,19 +32,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -55,18 +46,9 @@
       "status": 207,
       "body": "ready",
       "headers": [
-        [
-          "content-type",
-          "text/plain;charset=UTF-8"
-        ],
-        [
-          "x-a",
-          "a"
-        ],
-        [
-          "x-z",
-          "z"
-        ]
+        ["content-type", "text/plain;charset=UTF-8"],
+        ["x-a", "a"],
+        ["x-z", "z"]
       ]
     }
   },
@@ -103,20 +85,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers",
-          "body"
-        ],
+        "keys": ["method", "headers", "body"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": "payload"
       }
@@ -127,18 +99,9 @@
       "status": 207,
       "body": "ready",
       "headers": [
-        [
-          "content-type",
-          "text/plain;charset=UTF-8"
-        ],
-        [
-          "x-a",
-          "a"
-        ],
-        [
-          "x-z",
-          "z"
-        ]
+        ["content-type", "text/plain;charset=UTF-8"],
+        ["x-a", "a"],
+        ["x-z", "z"]
       ]
     }
   },
@@ -166,19 +129,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -239,19 +193,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -296,19 +241,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -354,19 +290,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -404,19 +331,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
@@ -453,19 +371,10 @@
       {
         "url": "http://example.invalid/",
         "method": "POST",
-        "keys": [
-          "method",
-          "headers"
-        ],
+        "keys": ["method", "headers"],
         "headers": [
-          [
-            "x-z",
-            "last"
-          ],
-          [
-            "x-a",
-            "middle"
-          ]
+          ["x-z", "last"],
+          ["x-a", "middle"]
         ],
         "body": null
       }
