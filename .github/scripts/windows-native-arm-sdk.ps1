@@ -3,7 +3,11 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'Arm64') { throw 'This provider requires an actual native Windows ARM64 host' }
 if ($SourceRevision -notmatch '^[0-9a-f]{40}$') { throw 'Invalid exact owning revision' }
-$gitImage=(Get-Command git -CommandType Application -ErrorAction Stop).Source
+# The ARM64 runner image carries two git.exe on PATH (PortableGit\clangarm64\bin and
+# PortableGit\bin). Without -First 1 the .Source of both is joined into one string and
+# FileStream refuses it ("filename, directory name, or volume label syntax is incorrect").
+# The first hit is the executable the PATH lookup selects; the SHA below pins its bytes.
+$gitImage=(Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $gitStream=[IO.FileStream]::new($gitImage,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
 $gitSHA=(Get-FileHash -LiteralPath $gitImage -Algorithm SHA256).Hash
 function Metadata-Git([string[]]$arguments) {

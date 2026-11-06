@@ -48,10 +48,14 @@
 ## `TimerHandle` ref (necessary for cancellation), which matches the
 ## allocation profile of `addTimer` in asyncdispatch / chronos.
 
+import ./raw_nondet
+export raw_nondet
+
 import std/[monotimes, options]
 
 import ./async_compat
 import ./fake_time
+import ./backend
 
 export async_compat
 export fake_time
@@ -69,7 +73,7 @@ export options.get
 # sleepFor — relocated from async_compat.nim (signature unchanged).
 # ---------------------------------------------------------------------------
 
-proc sleepFor*(ms: int): PlatformFuture[void] =
+proc sleepForRaw*(access: RawBackendAccess; ms: int): PlatformFuture[void] {.tags: [RawNondet].} =
   ## Cross-backend sleep primitive.
   ##
   ## If a `FakeAsyncContext` is installed on the current thread, the
@@ -85,33 +89,53 @@ proc sleepFor*(ms: int): PlatformFuture[void] =
   ##   - chronos: `chronos.sleepAsync(ms.milliseconds)`
   ##   - none: raises a Defect (no event loop, no fake context →
   ##           there is nothing that could wake the sleep)
-  let fake = currentFakeContext()
-  if fake != nil:
-    when defined(js):
-      var resolveFn: proc()
-      result = newPromise proc(resolve: proc()) =
-        resolveFn = resolve
-      fake.schedule(ms, proc() = resolveFn())
-    else:
-      let fut = newFuture[void]("nim-everywhere sleepFor (fake-time)")
-      fake.schedule(ms, proc() = fut.complete())
-      result = fut
-    return
+  {.cast(tags: []).}:
+    let fake = currentFakeContext()
+    if fake != nil:
+      when defined(js):
+        var resolveFn: proc()
+        result = newPromise proc(resolve: proc()) =
+          resolveFn = resolve
+        fake.schedule(ms, proc() = resolveFn())
+      else:
+        let fut = newFuture[void]("nim-everywhere sleepFor (fake-time)")
+        fake.schedule(ms, proc() = fut.complete())
+        result = fut
+      return
 
-  when defined(js):
-    let msArg = ms
-    result = newPromise proc(resolve: proc()) =
-      {.emit: "setTimeout(function() { `resolve`(); }, `msArg`);".}
+    when defined(js):
+      let msArg = ms
+      result = newPromise proc(resolve: proc()) =
+        {.emit: "setTimeout(function() { `resolve`(); }, `msArg`);".}
+    else:
+      when asyncBackend in ["", "asyncdispatch", "nginx"]:
+        result = sleepAsync(ms)
+      elif asyncBackend == "chronos":
+        result = chronos.sleepAsync(chronos.milliseconds(ms))
+      elif asyncBackend == "none":
+        raise newException(Defect,
+          "sleepFor without an installed FakeAsyncContext requires an event loop; " &
+          "build with -d:asyncBackend=asyncdispatch|chronos, or install a " &
+          "FakeAsyncContext for deterministic tests")
+
+when defined(isonimStrictNondet):
+  proc sleepForRaw*(ms: int): PlatformFuture[void] {.error: "isonimStrictNondet: raw platform binding sleepForRaw; use the nondeterminism seam".}
+else:
+  proc sleepForRaw*(ms: int): PlatformFuture[void] {.tags: [RawNondet].} =
+    sleepForRaw(rawBackendAccess, ms)
+
+proc sleepFor*(ms: int): PlatformFuture[void] =
+  ## Sleep also reaches the hook; raw timers use sleepForRaw to avoid recursion.
+  if currentFakeContext() == nil and currentBackendHook != nil and currentBackendHook.schedule != nil:
+    when defined(js):
+      result = newPromise proc(resolve: proc()) =
+        discard currentBackendHook.schedule(ms, resolve)
+    else:
+      let pending = newFuture[void]("backend sleep")
+      discard currentBackendHook.schedule(ms, proc() = pending.complete())
+      result = pending
   else:
-    when asyncBackend in ["", "asyncdispatch"]:
-      result = sleepAsync(ms)
-    elif asyncBackend == "chronos":
-      result = chronos.sleepAsync(chronos.milliseconds(ms))
-    elif asyncBackend == "none":
-      raise newException(Defect,
-        "sleepFor without an installed FakeAsyncContext requires an event loop; " &
-        "build with -d:asyncBackend=asyncdispatch|chronos, or install a " &
-        "FakeAsyncContext for deterministic tests")
+    result = sleepForRaw(rawBackendAccess, ms)
 
 # ---------------------------------------------------------------------------
 # monotonicNowMs — int64 milliseconds, respecting the fake clock.
@@ -126,6 +150,8 @@ proc monotonicNowMs*(): int64 =
   let fake = currentFakeContext()
   if fake != nil:
     return fake.nowMs
+  if currentBackendHook != nil and currentBackendHook.monotonicNowMs != nil:
+    return currentBackendHook.monotonicNowMs()
   getMonoTime().ticks div 1_000_000
 
 # ---------------------------------------------------------------------------
@@ -140,6 +166,7 @@ type
     ## scheduleAt / scheduleEvery call and survives any number of
     ## firings until cancelled.
     cancelled*: bool
+    cancelBackend: proc()
 
 proc cancelTimer*(h: TimerHandle) =
   ## Stop pending firings. Idempotent — safe to call on an already-fired
@@ -147,6 +174,8 @@ proc cancelTimer*(h: TimerHandle) =
   ## firings will occur, though a periodic firing already in flight (the
   ## user callback currently executing) is not interrupted.
   if h != nil:
+    if not h.cancelled and h.cancelBackend != nil:
+      h.cancelBackend()
     h.cancelled = true
 
 # ---------------------------------------------------------------------------
@@ -229,7 +258,7 @@ proc withTimeout*[T](fut: PlatformFuture[T]; ms: int): PlatformFuture[Option[T]]
 # scheduleAt / scheduleEvery / cancelTimer — timer primitives.
 # ---------------------------------------------------------------------------
 
-proc scheduleAt*(afterMs: int; cb: proc()): TimerHandle =
+proc scheduleAtRaw*(access: RawBackendAccess; afterMs: int; cb: proc()): TimerHandle {.tags: [RawNondet].} =
   ## One-shot timer. `cb` fires `afterMs` milliseconds after the call
   ## site. Under fake time, fires when `advance(...)` crosses the target
   ## tick. Under real time, fires after a `sleepFor(afterMs)` completes
@@ -244,20 +273,37 @@ proc scheduleAt*(afterMs: int; cb: proc()): TimerHandle =
   ## defer firing until the next `drainPlatformCallbacks`). Under real
   ## time we funnel through `sleepFor` so the backend's native timer
   ## drives the firing.
-  let handle = TimerHandle(cancelled: false)
-  let fake = currentFakeContext()
-  if fake != nil:
-    fake.schedule(afterMs, proc() =
-      if not handle.cancelled:
-        cb())
-  else:
-    let slept = sleepFor(afterMs)
-    slept.onCompleteVoid(
-      onSuccess = proc() =
+  {.cast(tags: []).}:
+    let handle = TimerHandle(cancelled: false)
+    let fake = currentFakeContext()
+    if fake != nil:
+      fake.schedule(afterMs, proc() =
         if not handle.cancelled:
-          cb(),
-      onError = proc(msg: string) = discard)
-  handle
+          cb())
+    else:
+      let slept = sleepForRaw(rawBackendAccess, afterMs)
+      slept.onCompleteVoid(
+        onSuccess = proc() =
+          if not handle.cancelled:
+            cb(),
+        onError = proc(msg: string) = discard)
+    handle
+
+when defined(isonimStrictNondet):
+  proc scheduleAtRaw*(afterMs: int; cb: proc()): TimerHandle {.error: "isonimStrictNondet: raw platform binding scheduleAtRaw; use the nondeterminism seam".}
+else:
+  proc scheduleAtRaw*(afterMs: int; cb: proc()): TimerHandle {.tags: [RawNondet].} =
+    scheduleAtRaw(rawBackendAccess, afterMs, cb)
+
+proc scheduleAt*(afterMs: int; cb: proc()): TimerHandle =
+  ## Hooked timer entry point; raw timers permit delegation without recursion.
+  if currentFakeContext() == nil and currentBackendHook != nil and
+      currentBackendHook.schedule != nil:
+    let handle = TimerHandle()
+    handle.cancelBackend = currentBackendHook.schedule(afterMs, proc() =
+      if not handle.cancelled: cb())
+    return handle
+  scheduleAtRaw(rawBackendAccess, afterMs, cb)
 
 proc scheduleEvery*(intervalMs: int; cb: proc()): TimerHandle =
   ## Periodic timer. `cb` fires every `intervalMs` until cancelled.
@@ -276,6 +322,8 @@ proc scheduleEvery*(intervalMs: int; cb: proc()): TimerHandle =
   ## through `sleepFor` which means each re-arm bounces through the
   ## backend's microtask queue — but that's exactly the cadence a real
   ## periodic timer would have.
+  if intervalMs <= 0:
+    raise newException(ValueError, "timer interval must be positive")
   let handle = TimerHandle(cancelled: false)
   let fake = currentFakeContext()
 
@@ -308,14 +356,10 @@ proc scheduleEvery*(intervalMs: int; cb: proc()): TimerHandle =
     arm = proc() =
       if handle.cancelled:
         return
-      let slept = sleepFor(intervalMs)
-      slept.onCompleteVoid(
-        onSuccess = proc() =
-          if handle.cancelled:
-            return
-          cb()
-          if not handle.cancelled:
-            arm(),
-        onError = proc(msg: string) = discard)
+      let pending = scheduleAt(intervalMs, proc() =
+        if handle.cancelled: return
+        cb()
+        if not handle.cancelled: arm())
+      handle.cancelBackend = proc() = cancelTimer(pending)
   arm()
   handle
