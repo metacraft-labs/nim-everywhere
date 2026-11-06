@@ -77,7 +77,20 @@ def main():
             archive = subprocess.check_output(['git', '-C', str(args.reprobuild),
                                                 'archive', revision, 'libs', 'flake.lock'])
             with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-                tar.extractall(work, filter='data')
+                # `filter=` exists only on Python 3.12+ and the security backports
+                # (3.11.4+); the runner's interpreter may predate them. The archive is
+                # read from a revision-pinned object database, but the fallback still
+                # refuses any member that is not a plain file or directory inside work.
+                if hasattr(tarfile, 'data_filter'):
+                    tar.extractall(work, filter='data')
+                else:
+                    root = work.resolve()
+                    for member in tar.getmembers():
+                        target = (root / member.name).resolve()
+                        if not (member.isfile() or member.isdir()) or \
+                                root not in (target, *target.parents):
+                            raise SystemExit('unsafe member in engine archive: ' + member.name)
+                    tar.extractall(work)
             (work / 'probe.nim').write_text(PROBE)
             (work / 'v2.lock').write_text(V2_CONTROL)
             (work / 'committed.lock').write_bytes(committed)

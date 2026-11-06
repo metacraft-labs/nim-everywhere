@@ -111,7 +111,16 @@ jobs:
       - name: Verify CI engine reads the committed lock
         if: runner.os == 'Linux'
         shell: bash
-        run: dev-exec python3 tests/test_ci_engine_reads_committed_lock.py --reprobuild .reprobuild-src
+        run: |
+          # The isolated dev environment holds only declared tools, so a bare
+          # python3 is not on its PATH ("cannot execute python3"), yet the test
+          # needs the environment's nim and gcc. Hand dev-exec an absolute
+          # interpreter: the source bootstrap exports a rooted one as
+          # REPROBUILD_BOOTSTRAP_PYTHON; a release install leaves it unset and
+          # the runner's own python3 is used.
+          python_exe="${REPROBUILD_BOOTSTRAP_PYTHON:-$(command -v python3 || true)}"
+          : "${python_exe:?no python3: neither REPROBUILD_BOOTSTRAP_PYTHON nor python3 on PATH}"
+          dev-exec "$python_exe" tests/test_ci_engine_reads_committed_lock.py --reprobuild .reprobuild-src
 
       - name: Verify immutable source engine identity
         if: runner.os != 'Windows'
