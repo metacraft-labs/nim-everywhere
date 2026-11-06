@@ -257,6 +257,7 @@ jobs:
             .repro/windows-timer-observation/native-output.log
             .repro/windows-timer-observation/nimcache/*.json
             .repro/build/*/*-tool-identities.inspect.json
+            .repro/build/*/tool-identity-cache/*.inspect.json
             build/nimcache/**/*.json
             .repro/build/*/build-engine-cache/actions/
           include-hidden-files: true
