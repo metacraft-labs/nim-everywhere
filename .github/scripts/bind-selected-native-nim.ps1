@@ -25,10 +25,12 @@ try {
   # identity resolved for one key; the selected Nim must be one and the same
   # in every entry that names a Nim.
   $cacheDirectory = Join-Path $root '.repro/build/repro/tool-identity-cache'
+  $entryCount = 0
   $selected = @{}
   $fingerprints = @{}
   foreach ($entry in @(Get-ChildItem -LiteralPath $cacheDirectory -Filter '*.inspect.json' -File)) {
     $candidate = Get-Content -Raw -LiteralPath $entry.FullName | ConvertFrom-Json
+    $entryCount++
     if ($candidate.projectName -ne 'nim_everywhere') { throw 'Foreign selected tool inspection.' }
     # Every entry in this checkout must come from the same project interface
     # (the same repro.nim); an entry left by another interface is not evidence
@@ -85,8 +87,27 @@ try {
     $proof.nativePathMatchedFiles = $files
     $proof.bindingVariant = 'already-selected-native-path-2.2.8'
   } else {
-  $archiveSha = 'fe0686a9b298e5b13d0a983df37e002a8c6320f8b16cc45a51d15cf4046a109f'
-  if ($profile.packageSelector -ne 'nim' -or $profile.executableName -ne 'nim' -or $profile.packageId -ne 'nim@2.2.10' -or $profile.installMethod -ne 'tarball' -or $profile.archiveType -ne 'zip' -or $profile.stripComponents -ne 1 -or $profile.tarballSha256 -ne $archiveSha -or $profile.tarballUrl -ne 'https://nim-lang.org/download/nim-2.2.10_x64.zip' -or $profile.tarballSelectedUrl -ne $profile.tarballUrl -or $profile.declaredExecutablePath -ne 'bin/nim.exe' -or $profile.resolvedExecutableDigest -ne 'blake3:0aac2d15f0babe0a5ee234acdd3d550e180fe1cf5febc6cc10179482a4481680') { throw 'Selected Nim acquisition identity differs from the reviewed current profile.' }
+  $archiveSha = 'e6eaf87df71f83629a8877ac496bcd8cdb7755f9e860b982bb0b886e38eac1c3'
+  # Ordered [name, actual, expected] comparisons: the same conjuncts as before,
+  # but a refusal now names every field that differs (values are hashes, URLs
+  # and ids only) and which keyed inspection entry supplied the profile.
+  $acquisitionChecks = @(
+    ,@('packageSelector', $profile.packageSelector, 'nim')
+    ,@('executableName', $profile.executableName, 'nim')
+    ,@('packageId', $profile.packageId, 'nim@2.2.10')
+    ,@('installMethod', $profile.installMethod, 'tarball')
+    ,@('archiveType', $profile.archiveType, 'zip')
+    ,@('stripComponents', $profile.stripComponents, 1)
+    ,@('tarballSha256', $profile.tarballSha256, $archiveSha)
+    ,@('tarballUrl', $profile.tarballUrl, 'https://github.com/metacraft-labs/nim/releases/download/nim-2.2.10-vccexe-8910b50d2d21ca1a3e982fe8b8b9bf0d8832e633/nim-2.2.10-vccexe-8910b50d2d21ca1a3e982fe8b8b9bf0d8832e633-windows-x64.zip')
+    ,@('tarballSelectedUrl', $profile.tarballSelectedUrl, $profile.tarballUrl)
+    ,@('declaredExecutablePath', $profile.declaredExecutablePath, 'bin/nim.exe')
+    ,@('resolvedExecutableDigest', $profile.resolvedExecutableDigest, 'blake3:b5e0e2d606410f1a0b64c4d29d6638e844ac0183f040cc09e7c325405b6870f7')
+  )
+  $acquisitionMismatches = @($acquisitionChecks | Where-Object { $_[1] -ne $_[2] } | ForEach-Object { "$($_[0]): actual=<$($_[1])> expected=<$($_[2])>" })
+  if ($acquisitionMismatches.Count -ne 0) {
+    throw ('Selected Nim acquisition identity differs from the reviewed current profile.' + [Environment]::NewLine + ($acquisitionMismatches -join [Environment]::NewLine) + [Environment]::NewLine + "chosen inspection entry: $inspectionPath" + [Environment]::NewLine + "keyed entries seen: $($entryCount); distinct Nim identities: $($selected.Count)")
+  }
   $prefix = [System.IO.Path]::GetFullPath($profile.selectedStorePath)
   $prefixParent = [System.IO.Path]::GetFullPath((Join-Path $root '.repro/build/repro/tool-store/prefixes/nim'))
   if ([System.IO.Path]::GetDirectoryName($prefix) -ne $prefixParent -or $profile.lockIdentity -ne "tarball:nim@2.2.10:sha256:$archiveSha" -or $profile.realizationBoundary -ne $profile.selectedStorePath -or @($profile.realizedStorePaths).Count -ne 1 -or $profile.realizedStorePaths[0] -ne $profile.selectedStorePath) { throw 'Foreign or ambiguous Nim prefix.' }
