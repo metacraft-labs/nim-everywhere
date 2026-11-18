@@ -95,16 +95,22 @@ jobs:
         # (none for this pure-leaf library) at the
         # workspace-lock-pinned revisions before materialising the env.
         uses: metacraft-labs/metacraft-github-actions/setup-dev-env@8ee1026a5d427a7aa5cf8c036fab12cb3d009503
+        env:
+          WINDOWS_DIY_ARCH_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'x64' || '' }}
         with:
           env-flavor: reprobuild
-          repro-from-source: ${{ runner.os != 'Windows' && 'true' || 'false' }}
-          # Reprobuild v0.2.23. The engine reads the committed v3 lock; older
-          # engines fail with "unsupported lock schema ...v3 (expected ...v2)".
-          # Keep the bootstrap libraries at that engine's own flake-lock
-          # revisions (they apply to the POSIX from-source build).
-          repro-build-pin: 9dbf4e710d7cc0b9a79a4bcd54c931afb6849dd0
-          repro-runquota-pin: 9818dc0c90be8ba7993424a7bbfbb6e009ffa965
-          repro-io-mon-pin: 7a9b2f331024f4bc0b952bcab89b1dc48525d804
+          # The Reprobuild engine is the fleet pin: the `reprobuild` input of
+          # nixos-modules' (metacraft-labs/devops-modules) flake.lock. Every leg builds that revision from
+          # source (Windows ARM64 as x64 under emulation), so CI runs the
+          # engine the fleet runs; a release install would not. The companion
+          # pins are that revision's own flake.lock entries. These literals
+          # follow nixos-modules and are replaced when the pin moves into infra.
+          # tests/test_ci_engine_reads_committed_lock.py checks that this engine
+          # reads the committed v3 lock and that the companion pins match it.
+          repro-from-source: "true"
+          repro-build-pin: 84b459adda91535f0b89424dfc95aa34bfa67a32
+          repro-runquota-pin: f9e1a4d3f3ba7840aefe56883127653af9c5a608
+          repro-io-mon-pin: 35829647d603b481276d2632b39ec2a9ce3625b2
           repro-stackable-hooks-pin: c1d55ce33fb2a29e4cf8d8bdbe1713f355370d0a
           gh-token: ${{ steps.ci_token.outputs.token }}
           app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
@@ -128,7 +134,7 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           source_root="$GITHUB_WORKSPACE/.reprobuild-src"
-          test "$(git -C "$source_root" rev-parse HEAD)" = "9dbf4e710d7cc0b9a79a4bcd54c931afb6849dd0"
+          test "$(git -C "$source_root" rev-parse HEAD)" = "84b459adda91535f0b89424dfc95aa34bfa67a32"
           test -z "$(git -C "$source_root" status --porcelain)"
           test "$(command -v repro)" = "$source_root/build/bin/repro"
           git -C "$source_root" rev-parse HEAD
