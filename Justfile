@@ -209,8 +209,9 @@ test-http-projection:
     bash tests/check_http_projection_effects.sh
     node tests/test_http_projection_mutations.mjs
 
-# Compile each workflow-selected engine's real reader against the shipping lock.
-# Needs an adjacent Reprobuild Git checkout containing the selected revision
-# (or --reprobuild <dir> with a source tree of that revision) and python3.
+# Compile the CI engine's real reader (the fleet Reprobuild pin) against the
+# shipping lock. Needs adjacent metacraft-github-actions (pins/reprobuild.json)
+# and Reprobuild Git checkouts, the latter containing the pinned revision
+# (or --reprobuild <dir> with a source tree of that revision), and python3.
 test-ci-engine-lock:
     python3 tests/test_ci_engine_reads_committed_lock.py
